@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { InfoIcon, AlertCircle, FileText, CheckCircle, ArrowLeft } from "lucide-react"
+import { InfoIcon, AlertCircle, FileText, CheckCircle, ArrowLeft, Trash2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Progress } from "@/components/ui/progress"
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Database } from "@/lib/supabase/database.types"
+import DeleteLabReportDialog from "@/components/delete-lab-report-dialog"
 
 interface LabReportPageProps {
   params: {
@@ -71,6 +72,7 @@ export default function LabReportPage({ params }: LabReportPageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const { id } = params
   
   // Create a single Supabase client instance
@@ -546,7 +548,16 @@ export default function LabReportPage({ params }: LabReportPageProps) {
   }, [id, authChecked, router, supabase])
 
   const goBack = () => {
-    router.push('/dashboard')
+    router.push('/dashboard/labs')
+  }
+  
+  const handleDelete = () => {
+    setDeleteDialogOpen(true);
+  }
+  
+  const handleReportDeleted = () => {
+    // Redirect to the labs page after successful deletion
+    router.push('/dashboard/labs');
   }
 
   if (loading) {
@@ -770,11 +781,20 @@ export default function LabReportPage({ params }: LabReportPageProps) {
         <div className="flex items-center">
           <Button variant="ghost" size="sm" onClick={goBack} className="mr-2">
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+            Back to Lab Reports
           </Button>
           <h1 className="text-2xl font-bold">Your Labs</h1>
         </div>
-        <div className="text-right">
+        <div className="flex items-center">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-red-600 hover:text-red-800 hover:bg-red-50 border-red-200 mr-2"
+            onClick={handleDelete}
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Delete Report
+          </Button>
           <div className="text-sm text-gray-500">This is a beta version using AI. Use as a guide only and consult a medical professional for accurate advice.</div>
         </div>
       </div>
@@ -1154,6 +1174,14 @@ export default function LabReportPage({ params }: LabReportPageProps) {
           </div>
         </CardContent>
       </Card>
+
+      {/* Delete Dialog */}
+      <DeleteLabReportDialog
+        reportId={id}
+        isOpen={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onDeleted={handleReportDeleted}
+      />
     </div>
   )
 }

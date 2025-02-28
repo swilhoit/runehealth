@@ -3,12 +3,13 @@
 import { Suspense } from "react"
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { FlaskRoundIcon as Flask, Upload, FileText, Loader2, Bug, ChevronDown, ChevronUp } from "lucide-react"
+import { FlaskRoundIcon as Flask, Upload, FileText, Loader2, Bug, ChevronDown, ChevronUp, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { motion } from "framer-motion"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useRouter } from "next/navigation"
 import { format } from "date-fns"
+import DeleteLabReportDialog from "@/components/delete-lab-report-dialog"
 
 interface LabReport {
   id: string
@@ -27,6 +28,8 @@ export default function LabsPage() {
   const [error, setError] = useState<string | null>(null)
   const [showDebug, setShowDebug] = useState(false)
   const [expandedReports, setExpandedReports] = useState<{[key: string]: boolean}>({})
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [reportToDelete, setReportToDelete] = useState<string | null>(null)
   const supabase = createClientComponentClient({
     options: {
       global: {
@@ -92,6 +95,34 @@ export default function LabsPage() {
     
     router.push(`/dashboard/labs/${report.id}`)
   }
+
+  const handleDeleteClick = (reportId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent the view action from triggering
+    setReportToDelete(reportId);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleReportDeleted = async () => {
+    // Refresh the list of reports after successful deletion
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("lab_reports")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      setReports(data || []);
+    } catch (err) {
+      console.error("Error fetching lab reports:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch lab reports");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const toggleReportExpand = (reportId: string) => {
     setExpandedReports(prev => ({
@@ -219,6 +250,15 @@ export default function LabsPage() {
                               "View"
                             )}
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                            onClick={(e) => handleDeleteClick(report.id, e)}
+                            title="Delete report"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                       
@@ -254,6 +294,16 @@ export default function LabsPage() {
           </Card>
         </motion.div>
       </Suspense>
+
+      {/* Delete Dialog */}
+      {reportToDelete && (
+        <DeleteLabReportDialog
+          reportId={reportToDelete}
+          isOpen={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onDeleted={handleReportDeleted}
+        />
+      )}
     </div>
   )
 }
