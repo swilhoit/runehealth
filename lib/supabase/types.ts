@@ -55,45 +55,36 @@ export interface Database {
           recommendations?: Json
         }
       }
-      user_profiles: {
+      profiles: {
         Row: {
           id: string
           created_at: string
-          user_id: string
           full_name: string
-          date_of_birth?: string
-          gender?: string
-          height?: number
-          weight?: number
-          medical_conditions?: string[]
-          medications?: string[]
-          allergies?: string[]
+          email: string
+          avatar_url?: string
+          first_name?: string
+          last_name?: string
+          updated_at?: string
         }
         Insert: {
-          id?: string
+          id: string
           created_at?: string
-          user_id: string
-          full_name: string
-          date_of_birth?: string
-          gender?: string
-          height?: number
-          weight?: number
-          medical_conditions?: string[]
-          medications?: string[]
-          allergies?: string[]
+          full_name?: string
+          email?: string
+          avatar_url?: string
+          first_name?: string
+          last_name?: string
+          updated_at?: string
         }
         Update: {
           id?: string
           created_at?: string
-          user_id?: string
           full_name?: string
-          date_of_birth?: string
-          gender?: string
-          height?: number
-          weight?: number
-          medical_conditions?: string[]
-          medications?: string[]
-          allergies?: string[]
+          email?: string
+          avatar_url?: string
+          first_name?: string
+          last_name?: string
+          updated_at?: string
         }
       }
     }

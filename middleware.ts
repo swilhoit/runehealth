@@ -4,6 +4,7 @@ import type { NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
   const res = NextResponse.next()
+  
   const supabase = createMiddlewareClient({ req: request, res })
 
   // Refresh session if expired - this will update the session cookie if needed
@@ -13,7 +14,7 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getSession()
 
   // Handle authentication for protected routes
-  if (request.nextUrl.pathname.startsWith("/dashboard") || request.nextUrl.pathname.startsWith("/api/")) {
+  if (request.nextUrl.pathname.startsWith("/dashboard")) {
     if (!session) {
       // Store the original URL to redirect back after login
       const redirectUrl = new URL("/auth", request.url)
@@ -45,8 +46,9 @@ export const config = {
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
      * - public (public files)
+     * - api (API routes)
      */
-    "/((?!_next/static|_next/image|favicon.ico|public).*)",
+    "/((?!_next/static|_next/image|favicon.ico|public|api).*)",
   ],
 }
 

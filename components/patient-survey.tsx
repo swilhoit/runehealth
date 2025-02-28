@@ -52,10 +52,27 @@ const healthGoals = [
 
 const dietaryHabits = ["Vegetarian", "Vegan", "Pescatarian", "Omnivore", "Keto", "Paleo", "Gluten-free", "Dairy-free"]
 
-export function PatientSurvey({ onComplete }: { onComplete?: () => void }) {
+export interface SurveyData {
+  name: string;
+  age: string;
+  gender: string;
+  heightFeet: string;
+  heightInches: string;
+  weight: string;
+  symptoms: string[];
+  healthGoals: string[];
+  dietaryHabits: string[];
+  sleepQuality: number;
+  stressLevel: number;
+  exerciseFrequency: number;
+  waterIntake: number;
+  [key: string]: any;
+}
+
+export function PatientSurvey({ onComplete }: { onComplete?: (data: SurveyData) => void }) {
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState(0)
-  const [surveyData, setSurveyData] = useState({
+  const [surveyData, setSurveyData] = useState<SurveyData>({
     name: "",
     age: "",
     gender: "",
@@ -115,7 +132,13 @@ export function PatientSurvey({ onComplete }: { onComplete?: () => void }) {
 
         console.log("Data to submit:", dataToSubmit)
 
-        // Remove the animation and directly redirect
+        // Call onComplete callback if provided
+        if (onComplete) {
+          onComplete(dataToSubmit);
+          return;
+        }
+
+        // If no callback, proceed with default behavior (redirect)
         const redirectUrl = `/generating-recommendations?data=${encodeURIComponent(JSON.stringify(dataToSubmit))}`
         console.log("Redirecting to:", redirectUrl)
         router.push(redirectUrl)

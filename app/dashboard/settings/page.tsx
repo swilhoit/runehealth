@@ -1,6 +1,7 @@
 import { Suspense } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Settings } from "lucide-react"
+import { Settings, User } from "lucide-react"
+import { ModelSettings } from "@/components/model-settings"
 
 export default function SettingsPage() {
   return (
@@ -10,7 +11,7 @@ export default function SettingsPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Settings className="h-5 w-5 text-terra-600" />
+              <User className="h-5 w-5 text-terra-600" />
               Account Settings
             </CardTitle>
           </CardHeader>
@@ -18,6 +19,8 @@ export default function SettingsPage() {
             <p className="text-sand-600">Your account settings will appear here.</p>
           </CardContent>
         </Card>
+        
+        <ModelSettings />
       </Suspense>
     </div>
   )

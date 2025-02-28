@@ -70,6 +70,50 @@ export interface Database {
           created_at?: string
         }
       }
+      profiles: {
+        Row: {
+          id: string
+          email: string | null
+          full_name: string | null
+          avatar_url: string | null
+          created_at: string
+          updated_at: string
+          api_keys: {
+            openai: string
+            anthropic: string
+            groq: string
+            deepseek: string
+          } | null
+        }
+        Insert: {
+          id: string
+          email?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+          api_keys?: {
+            openai?: string
+            anthropic?: string
+            groq?: string
+            deepseek?: string
+          } | null
+        }
+        Update: {
+          id?: string
+          email?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          created_at?: string
+          updated_at?: string
+          api_keys?: {
+            openai?: string
+            anthropic?: string
+            groq?: string
+            deepseek?: string
+          } | null
+        }
+      }
     }
   }
 }

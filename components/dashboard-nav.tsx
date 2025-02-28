@@ -16,6 +16,7 @@ import {
   Settings,
   LogOut,
   Upload,
+  ClipboardList,
 } from "lucide-react"
 
 interface UserProfile {
@@ -25,13 +26,20 @@ interface UserProfile {
 
 export function DashboardNav() {
   const [user, setUser] = useState<UserProfile | null>(null)
-  const supabase = createClientComponentClient()
+  const supabase = createClientComponentClient({
+    options: {
+      global: {
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+      },
+    },
+  })
 
   useEffect(() => {
     const fetchUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       if (session) {
         const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
 
@@ -51,10 +59,11 @@ export function DashboardNav() {
   }
 
   const navItems = [
-    { href: "/dashboard", label: "Overview", icon: LayoutDashboard },
+    { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/dashboard/labs", label: "Lab Results", icon: Flask },
     { href: "/dashboard/upload-labs", label: "Upload Labs", icon: Upload },
     { href: "/dashboard/reports", label: "Reports", icon: FileText },
+    { href: "/dashboard/health-survey", label: "Health Survey", icon: ClipboardList },
     { href: "/dashboard/plan", label: "Health Plan", icon: Calendar },
     { href: "/dashboard/nutrition", label: "Nutrition", icon: Utensils },
     { href: "/dashboard/settings", label: "Settings", icon: Settings },

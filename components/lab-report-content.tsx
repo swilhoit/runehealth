@@ -8,6 +8,7 @@ import { Download, Share2, AlertTriangle, RefreshCw } from "lucide-react"
 import { BiomarkerCategory } from "@/components/biomarker-category"
 import { biomarkerCategories } from "@/lib/biomarker-ranges"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
+import { DeleteReportButton } from "./delete-report-button"
 
 // Mock data to use as fallback when API fails
 const fallbackBiomarkers = {
@@ -43,10 +44,40 @@ export function LabReportContent({ report }: LabReportContentProps) {
     report.biomarkers && Object.keys(report.biomarkers).length > 0 ? report.biomarkers : fallbackBiomarkers
 
   const handleDownload = async () => {
-    if (!report.pdf_url) return
+    // DEBUG: Add logging to help diagnose PDF viewing issues
+    console.log("DEBUG - Download PDF attempt:", {
+      hasPdfUrl: !!report.pdf_url,
+      pdfUrl: report.pdf_url,
+      reportId: report.id
+    });
+    
+    if (!report.pdf_url) {
+      console.error("No PDF URL available to download");
+      setLogs(prev => [...prev, "Error: No PDF URL available"]);
+      alert("PDF URL is missing. Please try re-uploading this lab report.");
+      return;
+    }
+    
     setIsDownloading(true)
     try {
+      console.log("Fetching PDF from URL:", report.pdf_url);
+      setLogs(prev => [...prev, `Attempting to fetch PDF from: ${report.pdf_url.substring(0, 30)}...`]);
+      
       const response = await fetch(report.pdf_url)
+      
+      // Log response details
+      console.log("PDF fetch response:", {
+        status: response.status,
+        ok: response.ok,
+        contentType: response.headers.get('content-type')
+      });
+      
+      setLogs(prev => [...prev, `PDF fetch response: status=${response.status}, contentType=${response.headers.get('content-type')}`]);
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
+      }
+      
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement("a")
@@ -56,10 +87,51 @@ export function LabReportContent({ report }: LabReportContentProps) {
       a.click()
       window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
+      setLogs(prev => [...prev, "PDF downloaded successfully"]);
     } catch (error) {
       console.error("Error downloading PDF:", error)
+      setLogs(prev => [...prev, `Error downloading PDF: ${error instanceof Error ? error.message : String(error)}`]);
+      alert(`Unable to download PDF. Error: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsDownloading(false)
+    }
+  }
+
+  // Add a function to attempt to fix the PDF URL
+  const handleFixPdfUrl = () => {
+    try {
+      if (!report.pdf_url) {
+        console.error("No PDF URL to fix");
+        return;
+      }
+      
+      setLogs(prev => [...prev, "Attempting to fix PDF URL..."]);
+      
+      // Try different variations of the URL to find one that works
+      const originalUrl = report.pdf_url;
+      
+      // Create URLs with different variations
+      const urls = [
+        originalUrl,
+        // Try without query parameters
+        originalUrl.split('?')[0],
+        // Try adding storage path if missing
+        !originalUrl.includes('/storage/v1/object/public/') 
+          ? `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/labs/${report.id}.pdf` 
+          : null,
+        // Try direct path
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/labs/${report.id}.pdf`,
+      ].filter(Boolean) as string[];
+      
+      setLogs(prev => [...prev, `Generated ${urls.length} URL variations to try`]);
+      console.log("URL variations to try:", urls);
+      
+      // Show the URL variations to the user for debugging
+      alert(`DEBUG - PDF URL variations we're trying:\n\n${urls.join('\n\n')}`);
+      
+    } catch (error) {
+      console.error("Error in handleFixPdfUrl:", error);
+      setLogs(prev => [...prev, `Error fixing PDF URL: ${error instanceof Error ? error.message : String(error)}`]);
     }
   }
 
@@ -111,8 +183,24 @@ export function LabReportContent({ report }: LabReportContentProps) {
             <RefreshCw className="mr-2 h-4 w-4" />
             Retry Analysis
           </Button>
+          <Button variant="outline" onClick={handleFixPdfUrl}>
+            Fix PDF
+          </Button>
+          <DeleteReportButton reportId={report.id} className="ml-2" />
         </div>
       </div>
+
+      {/* Debug info */}
+      {logs.length > 0 && (
+        <div className="bg-gray-100 p-4 rounded-md mb-4 mt-4">
+          <h3 className="font-medium mb-2">Debug Logs</h3>
+          <div className="text-xs font-mono h-32 overflow-y-auto">
+            {logs.map((log, i) => (
+              <div key={i} className="mb-1">{log}</div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Show error message but continue displaying data */}
       {(report.status === "error" || report.error_message) && (

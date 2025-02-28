@@ -20,7 +20,7 @@ export const metadata: Metadata = {
       { url: "https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Avatar-fMtSd4VKV0IXp928G8i1bDFN2d1yIF.png" },
     ],
   },
-    generator: 'v0.dev'
+  generator: 'v0.dev'
 }
 
 export default function RootLayout({
@@ -34,14 +34,12 @@ export default function RootLayout({
         <ErrorBoundary>
           <DisclaimerBanner />
           <main className="min-h-screen">{children}</main>
-          <Footer />
+          {/* Remove footer from all pages - dashboard pages have their own layout anyway */}
           <Toaster />
         </ErrorBoundary>
       </body>
     </html>
   )
 }
-
-
 
 import './globals.css'

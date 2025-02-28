@@ -37,42 +37,32 @@ export function RegisterForm() {
     }
 
     try {
-      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-        email: formData.email,
-        password: formData.password,
-        options: {
-          data: {
-            full_name: formData.name,
-          },
+      // Use the server-side API route for registration
+      const response = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
+        body: JSON.stringify({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+        }),
       })
 
-      if (signUpError) {
-        throw signUpError
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to create account")
       }
 
-      if (signUpData.user) {
-        // Create a profile record in your profiles table
-        const { error: profileError } = await supabase.from("profiles").insert([
-          {
-            id: signUpData.user.id,
-            full_name: formData.name,
-            email: formData.email,
-          },
-        ])
+      toast({
+        title: "Success",
+        description: "Your account has been created successfully.",
+      })
 
-        if (profileError) {
-          throw profileError
-        }
-
-        toast({
-          title: "Success",
-          description: "Your account has been created successfully.",
-        })
-
-        // Force a hard reload to ensure the session is properly updated
-        window.location.href = "/dashboard"
-      }
+      // Force a hard reload to ensure the session is properly updated
+      window.location.href = "/dashboard"
     } catch (err) {
       console.error("Registration error:", err)
       setError(err instanceof Error ? err.message : "Failed to create account")

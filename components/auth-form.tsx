@@ -47,7 +47,18 @@ export function AuthForm({ type }: AuthFormProps) {
           password,
         })
         if (error) throw error
-        router.push("/dashboard")
+        
+        // Check if there's a redirect URL in localStorage
+        const redirectUrl = localStorage.getItem('redirectAfterLogin')
+        if (redirectUrl) {
+          // Clear the redirect URL to prevent future automatic redirects
+          localStorage.removeItem('redirectAfterLogin')
+          router.push(redirectUrl)
+        } else {
+          // Default redirect to dashboard
+          router.push("/dashboard")
+        }
+        
         router.refresh()
       }
     } catch (error) {
