@@ -160,7 +160,7 @@ export default function LabsPage() {
           >
             <Bug className="h-4 w-4" />
           </Button>
-          <Button className="bg-terra-600 hover:bg-terra-700 text-white" onClick={handleUploadClick}>
+          <Button onClick={handleUploadClick}>
             <Upload className="w-4 h-4 mr-2" />
             Upload New Results
           </Button>
@@ -189,7 +189,7 @@ export default function LabsPage() {
           <Card className="bg-white/80 backdrop-blur-sm border-sand-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl font-light">
-                <Flask className="h-5 w-5 text-terra-600" />
+                <Flask className="h-5 w-5 text-[#725556]" />
                 Lab Reports
               </CardTitle>
             </CardHeader>
@@ -226,7 +226,7 @@ export default function LabsPage() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="ml-auto"
+                              className="ml-auto hover:bg-[#725556]/10 hover:text-[#725556]"
                               onClick={() => toggleReportExpand(report.id)}
                             >
                               {expandedReports[report.id] ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -235,7 +235,7 @@ export default function LabsPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            className="ml-auto"
+                            className="ml-auto text-[#725556] hover:bg-[#725556]/10"
                             onClick={() => {
                               console.log("Viewing lab report:", report.id, "Status:", report.status);
                               handleViewReport(report);
@@ -311,7 +311,7 @@ export default function LabsPage() {
 function LoadingState() {
   return (
     <div className="flex items-center justify-center py-8">
-      <Loader2 className="h-8 w-8 animate-spin text-terra-600" />
+      <Loader2 className="h-8 w-8 animate-spin text-[#725556]" />
     </div>
   )
 }

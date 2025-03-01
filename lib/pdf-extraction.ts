@@ -1,6 +1,6 @@
 import { PDFDocument } from "pdf-lib"
 import type { Logger } from "@/lib/logger"
-import { findBiomarkerCode, isValidBiomarkerName, isValidBiomarkerNameSync } from "@/lib/biomarker-utils"
+import { findBiomarkerCode, isValidBiomarkerName, isValidBiomarkerNameSync, segmentWords } from "@/lib/biomarker-utils"
 import PDFParse from "pdf-parse"
 import fs from 'fs'
 import path from 'path'
@@ -21,96 +21,120 @@ const fileExists = (filePath: string): boolean => {
   }
 }
 
-export async function extractTextFromPDF(buffer: ArrayBuffer, logger: Logger): Promise<string> {
+/**
+ * Preprocesses PDF text to fix common extraction issues
+ * @param text Raw text extracted from PDF
+ * @returns Processed text with common issues fixed
+ */
+export function preprocessPdfText(text: string): string {
+  // Replace common run-together words with proper spacing
+  let processed = text;
+  
+  // Fix joined words by inserting spaces between patterns
+  processed = processed.replace(/([a-z])([A-Z])/g, '$1 $2'); // CamelCase to words
+  
+  // Fix common biomarker-specific patterns
+  const patterns = [
+    // Fix common prefix issues
+    [/\b(serum|plasma)([a-z]+)/gi, '$1 $2'],
+    [/\b(vitamin)([a-z])/gi, '$1 $2'],
+    [/\b(total)([a-z]+)/gi, '$1 $2'],
+    
+    // Fix common suffix issues
+    [/([a-z])(concentration)/gi, '$1 $2'],
+    [/([a-z])(lessthan)/gi, '$1 less than'],
+    [/lessthan\b/gi, 'less than'],
+    
+    // Fix common test name issues
+    [/\bohvitamin([a-z])\b/gi, 'oh vitamin $1'],
+    [/\b25ohvitamin([a-z])\b/gi, '25-oh vitamin $1'],
+    [/\b25hydroxyvitamin([a-z])\b/gi, '25-hydroxy vitamin $1'],
+    
+    // Fix common cholesterol pattern issues
+    [/\b(hdl|ldl|vldl)cholesterol\b/gi, '$1 cholesterol'],
+    [/\b(hdl|ldl|vldl)chol\b/gi, '$1 cholesterol'],
+    [/\bldlcalc\b/gi, 'ldl calc'],
+    
+    // Fix other common joined words
+    [/bloodurea/gi, 'blood urea'],
+    [/redblood/gi, 'red blood'],
+    [/whiteblood/gi, 'white blood'],
+  ];
+  
+  for (const [pattern, replacement] of patterns) {
+    processed = processed.replace(pattern, replacement as string);
+  }
+  
+  // Handle cases where "a" is attached to the biomarker
+  processed = processed.replace(/\ba(serum|plasma|blood|urine|vitamin|total|folate|calcium|glucose)/gi, 'a $1');
+  
+  return processed;
+}
+
+export async function extractTextFromPDF(pdfBuffer: ArrayBuffer, logger: Logger): Promise<string> {
   try {
-    logger.debug("Starting PDF extraction with pdf-parse")
+    logger.debug("Starting PDF text extraction");
     
-    // Log buffer details to help diagnose issues
-    logger.debug("PDF buffer info", {
-      byteLength: buffer.byteLength,
-      isValidBuffer: buffer.byteLength > 0
-    })
+    const data = await PDFParse(Buffer.from(pdfBuffer));
     
-    // Convert ArrayBuffer to Buffer for pdf-parse
-    const data = Buffer.from(buffer)
+    // Apply preprocessing to clean up the extracted text
+    const processedText = preprocessPdfText(data.text);
     
-    logger.debug("Buffer created successfully", {
-      bufferLength: data.length
-    })
+    logger.debug("PDF text extracted successfully", {
+      pageCount: data.numpages,
+      textLength: data.text.length,
+      processedTextLength: processedText.length
+    });
     
-    // Extract text using pdf-parse
-    logger.debug("Calling pdf-parse", {})
-    
-    // Skip actual PDF parsing during build if importing a test file that doesn't exist
-    // This prevents build errors when the test PDF is missing
-    if (process.env.NODE_ENV === 'production' && !buffer.byteLength) {
-      logger.warn("Empty buffer detected in production build - returning mock data")
-      return "MOCK_PDF_TEXT_FOR_BUILD"
-    }
-    
-    const result = await PDFParse(data)
-    const text = result.text
-    
-    if (!text.trim()) {
-      logger.error("PDF extraction completed but no text content found", new Error("Empty text content"))
-      throw new Error("No text content extracted from PDF")
-    }
-    
-    logger.debug("Successfully extracted text", {
-      textLength: text.length,
-      pageCount: result.numpages,
-      preview: text.substring(0, 200)
-    })
-    
-    return text
+    return processedText;
   } catch (error) {
-    // During build, if we get a file not found error, return mock data to prevent build failure
-    if (process.env.NODE_ENV === 'production' && error instanceof Error && 
-        (error.message.includes('ENOENT') || error.message.includes('no such file'))) {
-      logger.warn("File not found during build - returning mock data", { error })
-      return "MOCK_PDF_TEXT_FOR_BUILD"
-    }
-    
-    logger.error("PDF extraction failed", error, {
-      bufferLength: buffer?.byteLength
-    })
-    throw new Error("Failed to extract text from PDF")
+    logger.error("Error extracting text from PDF", error as Error);
+    throw new Error("Failed to extract text from PDF");
   }
 }
 
 export async function analyzePDFText(text: string, logger: Logger): Promise<ExtractedBiomarker[]> {
   const biomarkers: ExtractedBiomarker[] = []
 
+  // Preprocess the text
+  const processedText = preprocessPdfText(text);
+  
+  logger.debug("Preprocessed PDF text", {
+    originalLength: text.length,
+    processedLength: processedText.length,
+    sample: processedText.substring(0, 200)
+  });
+
   // Common patterns for lab values
   const patterns = [
     // Pattern: "Test Name: 123 mg/dL"
-    /([A-Za-z\s]+):\s*(\d+\.?\d*)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L)/g,
+    /([A-Za-z\s\-\(\)]+):\s*(\d+\.?\d*)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L|Highmg\/dL|8\-4108)/g,
     // Pattern: "Test Name 123 mg/dL"
-    /([A-Za-z\s]+)\s+(\d+\.?\d*)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L)/g,
+    /([A-Za-z\s\-\(\)]+)\s+(\d+\.?\d*)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L|Highmg\/dL|8\-4108)/g,
     // Pattern: "123 mg/dL Test Name"
-    /(\d+\.?\d*)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L)\s+([A-Za-z\s]+)/g,
+    /(\d+\.?\d*)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L|Highmg\/dL|8\-4108)\s+([A-Za-z\s\-\(\)]+)/g,
     // Additional pattern for ranges: "Test Name: 123 (70-100) mg/dL"
-    /([A-Za-z\s]+):\s*(\d+\.?\d*)\s*\(\d+\.?\d*-\d+\.?\d*\)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L)/g,
+    /([A-Za-z\s\-\(\)]+):\s*(\d+\.?\d*)\s*\(\d+\.?\d*-\d+\.?\d*\)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L|Highmg\/dL|8\-4108)/g,
     // Additional pattern for ranges: "Test Name 123 (70-100) mg/dL"
-    /([A-Za-z\s]+)\s+(\d+\.?\d*)\s*\(\d+\.?\d*-\d+\.?\d*\)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L)/g,
+    /([A-Za-z\s\-\(\)]+)\s+(\d+\.?\d*)\s*\(\d+\.?\d*-\d+\.?\d*\)\s*(mg\/dL|ng\/mL|g\/dL|%|U\/L|Highmg\/dL|8\-4108)/g,
     // More specific formats with various units
-    /([A-Za-z\s\-]+):\s*(\d+\.?\d*)\s*(mmol\/L|µmol\/L|nmol\/L|pmol\/L|mIU\/L|pg\/mL|mEq\/L)/g,
-    /([A-Za-z\s\-]+)\s+(\d+\.?\d*)\s*(mmol\/L|µmol\/L|nmol\/L|pmol\/L|mIU\/L|pg\/mL|mEq\/L)/g,
+    /([A-Za-z\s\-\(\)]+):\s*(\d+\.?\d*)\s*(mmol\/L|µmol\/L|nmol\/L|pmol\/L|mIU\/L|pg\/mL|mEq\/L)/g,
+    /([A-Za-z\s\-\(\)]+)\s+(\d+\.?\d*)\s*(mmol\/L|µmol\/L|nmol\/L|pmol\/L|mIU\/L|pg\/mL|mEq\/L)/g,
     // Patterns with table-like spacing (tab or multiple spaces)
-    /([A-Za-z\s\-]+)\t+(\d+\.?\d*)\t+([A-Za-z\/\s]+)/g,
-    /([A-Za-z\s\-]+)\s{2,}(\d+\.?\d*)\s{2,}([A-Za-z\/\s]+)/g,
+    /([A-Za-z\s\-\(\)]+)\t+(\d+\.?\d*)\t+([A-Za-z\/\s\%]+)/g,
+    /([A-Za-z\s\-\(\)]+)\s{2,}(\d+\.?\d*)\s{2,}([A-Za-z\/\s\%]+)/g,
     // Patterns with reference ranges
-    /([A-Za-z\s\-]+)\s*(\d+\.?\d*)\s*Reference Range:\s*[\d\.\-]+\s*([A-Za-z\/\s]+)/g,
+    /([A-Za-z\s\-\(\)]+)\s*(\d+\.?\d*)\s*Reference Range:\s*[\d\.\-]+\s*([A-Za-z\/\s\%]+)/g,
     // Patterns with "result" keyword
-    /([A-Za-z\s\-]+)\s*Result:\s*(\d+\.?\d*)\s*([A-Za-z\/\s]+)/g,
+    /([A-Za-z\s\-\(\)]+)\s*Result:\s*(\d+\.?\d*)\s*([A-Za-z\/\s\%]+)/g,
     // Additional patterns for common lab report formats
     /([A-Za-z\s\-\(\)]+)\s*(\d+\.?\d*)\s*(\d+\-\d+|\<\d+|\>\d+)\s*([A-Za-z\/\s\%]+)/g, // Name Value ReferenceRange Unit
     /([A-Za-z\s\-\(\)]+)\s*(\d+\.?\d*)\s*([A-Za-z\/\s\%]+)\s*(\d+\-\d+|\<\d+|\>\d+)/g, // Name Value Unit ReferenceRange
-  ]
+  ];
 
   logger.debug("Starting PDF text analysis", { 
-    textLength: text.length,
-    textPreview: text.substring(0, 300).replace(/\n/g, " ")
+    textLength: processedText.length,
+    textPreview: processedText.substring(0, 300).replace(/\n/g, " ")
   })
 
   let matchCount = 0
@@ -123,7 +147,10 @@ export async function analyzePDFText(text: string, logger: Logger): Promise<Extr
   for (const pattern of patterns) {
     logger.debug(`Trying pattern: ${pattern.source}`)
     let match
-    while ((match = pattern.exec(text)) !== null) {
+    // Reset regex lastIndex to ensure we start from the beginning
+    pattern.lastIndex = 0;
+    
+    while ((match = pattern.exec(processedText)) !== null) {
       matchCount++
       try {
         let name, value, unit
@@ -150,8 +177,19 @@ export async function analyzePDFText(text: string, logger: Logger): Promise<Extr
             unit
           })
         } else {
-          invalidBiomarkers++
-          logger.debug(`Rejected biomarker (sync): "${name}"`)
+          // Try segmenting the name to see if that helps
+          const segmented = segmentWords(name);
+          if (segmented !== name && isValidBiomarkerNameSync(segmented, logger)) {
+            logger.debug(`Segmented biomarker validated: "${name}" -> "${segmented}"`)
+            pendingValidations.push({
+              name: segmented,
+              value: Number.parseFloat(value),
+              unit
+            })
+          } else {
+            invalidBiomarkers++
+            logger.debug(`Rejected biomarker (sync): "${name}"`)
+          }
         }
       } catch (error) {
         logger.warn("Error parsing biomarker match", { error, match: match[0] })

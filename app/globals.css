@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Gilda+Display&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -13,24 +14,24 @@
     --popover: 0 0% 100%;
     --popover-foreground: 240 10% 3.9%;
 
-    --primary: 240 5.9% 10%;
+    --primary: 0 11% 40%; /* #725556 */
     --primary-foreground: 0 0% 98%;
 
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary: 345 17% 48%; /* #865C69 */
+    --secondary-foreground: 0 0% 98%;
 
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted: 26 25% 93%; /* #ECE8E6 */
+    --muted-foreground: 217 8% 49%; /* #7A8084 */
 
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent: 345 17% 48%; /* #865C69 */
+    --accent-foreground: 0 0% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --border: 26 25% 93%; /* #ECE8E6 */
+    --input: 26 25% 93%; /* #ECE8E6 */
+    --ring: 0 11% 40%; /* #725556 */
 
     --radius: 0.5rem;
   }
@@ -42,6 +43,9 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading;
   }
 }
 

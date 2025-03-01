@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Database } from "@/lib/supabase/database.types"
-import DeleteLabReportDialog from "@/components/delete-lab-report-dialog"
 import HealthRadarChart from "@/components/health-radar-chart"
 
 interface LabReportPageProps {
@@ -73,7 +72,6 @@ export default function LabReportPage({ params }: LabReportPageProps) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const { id } = params
   
   // Create a single Supabase client instance
@@ -551,23 +549,14 @@ export default function LabReportPage({ params }: LabReportPageProps) {
   const goBack = () => {
     router.push('/dashboard/labs')
   }
-  
-  const handleDelete = () => {
-    setDeleteDialogOpen(true);
-  }
-  
-  const handleReportDeleted = () => {
-    // Redirect to the labs page after successful deletion
-    router.push('/dashboard/labs');
-  }
 
   if (loading) {
     return (
       <div className="container mx-auto py-8">
         <div className="flex items-center mb-6">
-          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2 text-[#725556] hover:bg-[#725556]/10">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Lab Results
           </Button>
           <h1 className="text-2xl font-bold">Lab Report</h1>
         </div>
@@ -591,9 +580,9 @@ export default function LabReportPage({ params }: LabReportPageProps) {
     return (
       <div className="container mx-auto py-8">
         <div className="flex items-center mb-6">
-          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2 text-[#725556] hover:bg-[#725556]/10">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Lab Results
           </Button>
           <h1 className="text-2xl font-bold">Lab Report</h1>
         </div>
@@ -621,7 +610,7 @@ export default function LabReportPage({ params }: LabReportPageProps) {
                 localStorage.setItem('redirectAfterLogin', window.location.pathname);
                 router.push('/auth/login');
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-[#865C69] hover:bg-[#865C69]/90 text-white"
             >
               Log In
             </Button>
@@ -632,13 +621,14 @@ export default function LabReportPage({ params }: LabReportPageProps) {
               onClick={() => {
                 window.location.reload();
               }}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-[#865C69] hover:bg-[#865C69]/90 text-white"
             >
               Reload Page
             </Button>
             <Button 
               onClick={goBack}
               variant="outline"
+              className="border-[#725556] text-[#725556] hover:bg-[#725556]/10"
             >
               Go Back to Dashboard
             </Button>
@@ -653,9 +643,9 @@ export default function LabReportPage({ params }: LabReportPageProps) {
     return (
       <div className="container mx-auto py-8">
         <div className="flex items-center mb-6">
-          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back
+          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2 text-[#725556] hover:bg-[#725556]/10">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Lab Results
           </Button>
           <h1 className="text-2xl font-bold">Lab Report</h1>
         </div>
@@ -671,7 +661,7 @@ export default function LabReportPage({ params }: LabReportPageProps) {
                 onClick={() => {
                   window.location.reload();
                 }}
-                className="bg-blue-600 hover:bg-blue-700"
+                className="bg-[#865C69] hover:bg-[#865C69]/90 text-white"
               >
                 Try Again
               </Button>
@@ -780,22 +770,13 @@ export default function LabReportPage({ params }: LabReportPageProps) {
     <div className="container mx-auto py-8">
       <div className="flex justify-between items-start mb-6">
         <div className="flex items-center">
-          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Lab Reports
+          <Button variant="ghost" size="sm" onClick={goBack} className="mr-2 text-[#725556] hover:bg-[#725556]/10">
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            Back to Lab Results
           </Button>
           <h1 className="text-2xl font-bold">Your Labs</h1>
         </div>
         <div className="flex items-center">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="text-red-600 hover:text-red-800 hover:bg-red-50 border-red-200 mr-2"
-            onClick={handleDelete}
-          >
-            <Trash2 className="h-4 w-4 mr-2" />
-            Delete Report
-          </Button>
           <div className="text-sm text-gray-500">This is a beta version using AI. Use as a guide only and consult a medical professional for accurate advice.</div>
         </div>
       </div>
@@ -999,7 +980,7 @@ export default function LabReportPage({ params }: LabReportPageProps) {
               <div className="flex flex-col items-center space-y-6">
                 {/* Chart.js Radar Chart */}
                 {report && (
-                  <div className="w-full max-w-[350px] mx-auto">
+                  <div className="w-full h-64 max-w-[300px] mx-auto mb-6">
                     <HealthRadarChart 
                       scores={{
                         cardio: getHealthScore(report, 
@@ -1105,14 +1086,6 @@ export default function LabReportPage({ params }: LabReportPageProps) {
           </div>
         </CardContent>
       </Card>
-
-      {/* Delete Dialog */}
-      <DeleteLabReportDialog
-        reportId={id}
-        isOpen={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        onDeleted={handleReportDeleted}
-      />
     </div>
   )
 }

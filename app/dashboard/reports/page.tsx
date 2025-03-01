@@ -98,7 +98,7 @@ export default function ReportsPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <CardTitle className="flex items-center gap-2">
-                        <ClipboardList className="h-5 w-5 text-terra-600" />
+                        <ClipboardList className="h-5 w-5 text-[#725556]" />
                         Health Survey Report
                       </CardTitle>
                       <CardDescription>
@@ -117,7 +117,7 @@ export default function ReportsPage() {
                   {/* Personal Information Section */}
                   <div>
                     <h2 className="text-2xl font-light text-sand-900 mb-6 pb-2 border-b border-sand-200 flex items-center gap-2">
-                      <FileText className="h-6 w-6 text-terra-600" />
+                      <FileText className="h-6 w-6 text-[#725556]" />
                       Personal Information
                     </h2>
                     <div className="grid md:grid-cols-2 gap-8">
@@ -214,7 +214,7 @@ export default function ReportsPage() {
                   {/* Detailed Health Information */}
                   <div>
                     <h2 className="text-2xl font-light text-sand-900 mb-6 pb-2 border-b border-sand-200 flex items-center gap-2">
-                      <ClipboardList className="h-6 w-6 text-terra-600" />
+                      <ClipboardList className="h-6 w-6 text-[#725556]" />
                       Detailed Health Information
                     </h2>
                     <div className="grid md:grid-cols-3 gap-6">
@@ -271,7 +271,7 @@ export default function ReportsPage() {
                   {/* Basic Recommendations */}
                   <div>
                     <h2 className="text-2xl font-light text-sand-900 mb-6 pb-2 border-b border-sand-200 flex items-center gap-2">
-                      <Activity className="h-6 w-6 text-terra-600" />
+                      <Activity className="h-6 w-6 text-[#725556]" />
                       Basic Recommendations
                     </h2>
                     <div className="bg-sand-50 rounded-lg p-6">
@@ -287,7 +287,7 @@ export default function ReportsPage() {
                             <ul className="space-y-3">
                               {surveyData.recommendations.lifestyle.map((rec: string, index: number) => (
                                 <li key={index} className="flex items-start gap-3 bg-white p-3 rounded-md shadow-sm">
-                                  <Activity className="h-5 w-5 text-terra-600 shrink-0 mt-0.5" />
+                                  <Activity className="h-5 w-5 text-[#725556] shrink-0 mt-0.5" />
                                   <span>{rec}</span>
                                 </li>
                               ))}
@@ -302,11 +302,11 @@ export default function ReportsPage() {
                   {surveyData.recommendations.ai && (
                     <div>
                       <h2 className="text-2xl font-light text-sand-900 mb-6 pb-2 border-b border-sand-200 flex items-center gap-2">
-                        <Zap className="h-6 w-6 text-terra-600" />
+                        <Zap className="h-6 w-6 text-[#725556]" />
                         AI-Generated Insights
                       </h2>
                       
-                      <div className="bg-gradient-to-br from-sage-50/50 via-terra-50/30 to-sand-50/50 rounded-lg p-6 border border-terra-100">
+                      <div className="bg-gradient-to-br from-sage-50/50 via-[#EDE7DF]/30 to-sand-50/50 rounded-lg p-6 border border-[#EDE7DF]">
                         <div className="space-y-6">
                           <div>
                             <h3 className="text-lg font-medium text-sand-900 mb-2">Summary</h3>
@@ -427,14 +427,14 @@ export default function ReportsPage() {
                   <div className="flex justify-center pt-4 gap-4">
                     <Button 
                       variant="outline" 
-                      className="gap-2"
+                      className="gap-2 border-[#725556] text-[#725556] hover:bg-[#725556]/10"
                       onClick={() => window.print()}
                     >
                       <FileText className="h-4 w-4" />
                       Print Report
                     </Button>
                     <Button 
-                      className="bg-terra-600 hover:bg-terra-700 text-white gap-2"
+                      className="bg-[#725556] hover:bg-[#725556]/90 text-white gap-2"
                       onClick={() => window.location.href = "/dashboard/health-survey"}
                     >
                       <ClipboardList className="h-4 w-4" />
@@ -455,7 +455,7 @@ export default function ReportsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <FileText className="h-5 w-5 text-terra-600" />
+                <FileText className="h-5 w-5 text-[#725556]" />
                 Health Reports
               </CardTitle>
             </CardHeader>
@@ -465,7 +465,7 @@ export default function ReportsPage() {
                   View your health reports and analysis here. Complete a health survey to generate personalized recommendations.
                 </p>
                 <Button 
-                  className="bg-terra-600 hover:bg-terra-700 text-white"
+                  className="bg-[#725556] hover:bg-[#725556]/90 text-white"
                   onClick={() => window.location.href = "/dashboard/health-survey"}
                 >
                   <ClipboardList className="h-4 w-4 mr-2" />

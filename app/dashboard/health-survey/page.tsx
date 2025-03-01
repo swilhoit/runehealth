@@ -96,24 +96,34 @@ export default function HealthSurveyPage() {
       console.log("Saving survey data to database...")
       
       // Check if the survey_results table exists
-      const { error: tableCheckError } = await supabase
-        .from('survey_results')
-        .select('count')
-        .limit(1)
-        .throwOnError()
-        .single()
+      try {
+        const { error: tableCheckError } = await supabase
+          .from('survey_results')
+          .select('count')
+          .limit(1)
+          .throwOnError()
+          .single()
 
-      if (tableCheckError) {
-        console.error("Table check error:", tableCheckError.message, tableCheckError.details, tableCheckError.hint)
-        
-        if (tableCheckError.message.includes("relation") && tableCheckError.message.includes("does not exist")) {
-          toast({
-            title: "Database Setup Required",
-            description: "The survey_results table does not exist. Please run the database migrations first.",
-            variant: "destructive",
-          })
-          return
+        if (tableCheckError) {
+          console.error("Table check error:", tableCheckError.message, tableCheckError.details, tableCheckError.hint)
+          
+          if (tableCheckError.message.includes("relation") && tableCheckError.message.includes("does not exist")) {
+            toast({
+              title: "Database Setup Required",
+              description: "The survey_results table does not exist. Please run the database migrations first.",
+              variant: "destructive",
+            })
+            return
+          }
         }
+      } catch (err: any) {
+        console.error("Error checking survey_results table:", err.message, err.details || '', err.hint || '')
+        toast({
+          title: "Database Access Error",
+          description: "Failed to access the survey database. This may be due to configuration issues.",
+          variant: "destructive",
+        })
+        return
       }
       
       // Generate AI recommendations using the existing API

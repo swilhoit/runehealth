@@ -7,6 +7,7 @@ import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import { usePathname } from "next/navigation"
 import {
   LayoutDashboard,
   FileText,
@@ -26,6 +27,7 @@ interface UserProfile {
 
 export function DashboardNav() {
   const [user, setUser] = useState<UserProfile | null>(null)
+  const pathname = usePathname()
   const supabase = createClientComponentClient({
     options: {
       global: {
@@ -70,7 +72,7 @@ export function DashboardNav() {
   ]
 
   return (
-    <div className="fixed inset-y-0 left-0 w-64 bg-white border-r border-sand-200">
+    <div className="fixed inset-y-0 left-0 w-64 bg-[#EDE7DF] border-r border-sand-200">
       <div className="flex flex-col h-full">
         {/* Header */}
         <div className="p-6 border-b border-sand-200">
@@ -89,16 +91,25 @@ export function DashboardNav() {
         {/* Navigation */}
         <ScrollArea className="flex-1 py-4">
           <nav className="space-y-1 px-2">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex items-center gap-3 px-3 py-2 text-sm text-sand-700 rounded-md hover:bg-sand-100 hover:text-sand-900 transition-colors"
-              >
-                <item.icon className="h-5 w-5" />
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const isActive = pathname === item.href || 
+                (item.href !== "/dashboard" && pathname?.startsWith(item.href));
+              
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-3 px-3 py-2 text-sm rounded-md transition-colors ${
+                    isActive 
+                      ? "bg-[#725556]/10 text-[#725556] font-medium" 
+                      : "text-sand-700 hover:bg-[#725556]/10 hover:text-[#725556]"
+                  }`}
+                >
+                  <item.icon className="h-5 w-5" />
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
         </ScrollArea>
 
@@ -117,7 +128,7 @@ export function DashboardNav() {
             </div>
             <Button
               variant="ghost"
-              className="w-full justify-start gap-2 text-sand-700 hover:text-sand-900"
+              className="w-full justify-start gap-2 text-[#725556] hover:bg-[#725556]/10 hover:text-[#725556]"
               onClick={handleSignOut}
             >
               <LogOut className="h-5 w-5" />

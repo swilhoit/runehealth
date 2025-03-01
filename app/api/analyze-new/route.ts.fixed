@@ -5,7 +5,6 @@ import { cookies } from "next/headers";
 import { Database } from "@/lib/supabase/database.types";
 import { SupabaseClient } from "@supabase/supabase-js";
 import crypto from "crypto";
-import { autoCorrectBiomarker } from '@/lib/biomarker-correction';
 
 // Helper function to add CORS headers
 function corsHeaders(response: NextResponse) {
@@ -382,22 +381,16 @@ export async function POST(request: Request) {
             
             // Convert pattern-matched biomarkers to database format
             for (const biomarker of extractedBiomarkers) {
-              // Auto-correct biomarker name if needed
-              const correctedName = autoCorrectBiomarker(biomarker.code);
-              
               allBiomarkers.push({
                 report_id: reportId,
-                name: correctedName,
+                name: biomarker.code,
                 value: biomarker.value.toString(),
                 unit: biomarker.unit,
                 reference_range: "",
                 category: "Pattern Matched",
                 flag: "",
                 in_range: true,
-                details: JSON.stringify({
-                  original_name: biomarker.code !== correctedName ? biomarker.code : undefined,
-                  auto_corrected: biomarker.code !== correctedName
-                })
+                details: ""
               });
             }
             

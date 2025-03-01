@@ -14,7 +14,7 @@ export default function NutritionPage() {
           <h1 className="text-4xl font-thin text-sand-900 mb-2">Nutrition</h1>
           <p className="text-sand-600 font-light">Your personalized nutrition insights and recommendations</p>
         </div>
-        <Button className="bg-terra-600 hover:bg-terra-700 text-white">
+        <Button className="bg-[#725556] hover:bg-[#725556]/90 text-white">
           <Utensils className="w-4 h-4 mr-2" />
           Log Meal
         </Button>
@@ -51,7 +51,7 @@ export default function NutritionPage() {
               <Card className="bg-white/80 backdrop-blur-sm border-sand-200">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-xl font-light">
-                    <meal.icon className="h-5 w-5 text-terra-600" />
+                    <meal.icon className="h-5 w-5 text-[#725556]" />
                     {meal.title}
                   </CardTitle>
                 </CardHeader>
@@ -77,7 +77,7 @@ export default function NutritionPage() {
           <Card className="bg-white/80 backdrop-blur-sm border-sand-200">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-xl font-light">
-                <Apple className="h-5 w-5 text-terra-600" />
+                <Apple className="h-5 w-5 text-[#725556]" />
                 Nutritional Insights
               </CardTitle>
             </CardHeader>
@@ -87,15 +87,15 @@ export default function NutritionPage() {
                   <h3 className="font-medium text-sand-900">Recommendations</h3>
                   <ul className="space-y-2 text-sand-600">
                     <li className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-terra-600" />
+                      <div className="w-2 h-2 rounded-full bg-[#725556]" />
                       Increase protein intake
                     </li>
                     <li className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-terra-600" />
+                      <div className="w-2 h-2 rounded-full bg-[#725556]" />
                       Add more leafy greens
                     </li>
                     <li className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-terra-600" />
+                      <div className="w-2 h-2 rounded-full bg-[#725556]" />
                       Reduce processed sugars
                     </li>
                   </ul>

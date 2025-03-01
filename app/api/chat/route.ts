@@ -1,6 +1,7 @@
 import { openai } from "@ai-sdk/openai"
 import { streamText } from "ai"
 import { Logger } from "@/lib/logging"
+import { cache } from "react"
 
 // Log OpenAI configuration at startup
 console.log("\n=== CHAT API CONFIGURATION ===");
@@ -15,40 +16,89 @@ if (process.env.OPENAI_API_KEY) {
 }
 console.log("================================\n");
 
-// Allow streaming responses up to 30 seconds
-export const maxDuration = 30
+// Add a simple in-memory cache for system prompts
+const systemPromptCache = new Map();
+
+// Allow streaming responses up to 60 seconds
+export const maxDuration = 60
 
 // Explicitly set Edge runtime
 export const runtime = "edge"
 
 /**
- * Builds a system prompt with lab report context and survey data
+ * Fetch lab context for a specific report ID
  */
-function buildSystemPrompt(labContext: any) {
+async function fetchLabContext(reportId: string) {
+  // Get the base URL for the API request - use hostname from the environment
+  const baseUrl = process.env.VERCEL_URL 
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:' + (process.env.PORT || '3000');
+  
+  // Use relative URL which will work regardless of port
+  const contextUrl = new URL(`/api/chat-context${reportId ? `?report_id=${reportId}` : ''}`, baseUrl);
+  
+  console.log(`Fetching context from: ${contextUrl.toString()}`);
+  
+  const contextResponse = await fetch(contextUrl, {
+    credentials: 'include',
+    cache: 'no-store',
+    headers: {
+      'Content-Type': 'application/json',
+      // Add cookies header for auth
+      'Cookie': 'cross-site-cookie=whatever;' // This is a dummy cookie to enable credentials
+    }
+  });
+  
+  if (!contextResponse.ok) {
+    throw new Error(`Failed to fetch lab context: ${contextResponse.status} ${contextResponse.statusText}`);
+  }
+  
+  const contextData = await contextResponse.json();
+  const labContext = contextData.context;
+  
+  console.log(`Lab context fetched successfully: ${labContext.hasResults ? 'has results' : 'no results'}`);
+  
+  if (labContext.hasResults) {
+    console.log(`Report: ${labContext.report.labName} (${labContext.report.testDate})`);
+    console.log(`Biomarkers: ${labContext.biomarkers.total} total, ${labContext.biomarkers.abnormal} abnormal`);
+  }
+  
+  return labContext;
+}
+
+/**
+ * Builds a system prompt with lab report context and survey data
+ * Now memoized for better performance
+ */
+const buildSystemPrompt = cache(function(labContext: any) {
+  // Check if we have a cached prompt for this context
+  const contextHash = labContext ? JSON.stringify({
+    surveyId: labContext.survey?.id,
+    reportId: labContext.report?.id,
+    healthScore: labContext.healthScore
+  }) : 'no-context';
+  
+  if (systemPromptCache.has(contextHash)) {
+    console.log("Using cached system prompt");
+    return systemPromptCache.get(contextHash);
+  }
+  
+  console.log("Building new system prompt");
+  
   let systemPrompt = `You are RuneHealth, a helpful AI health assistant.
 Be empathetic, clear, and focused on providing value to the user regarding their health.
 You can discuss general health topics, but you must never provide medical diagnoses.
 Always suggest consulting a healthcare professional for specific medical advice.
 
 IMPORTANT: Keep your responses brief and concise. Users prefer shorter responses that are easier to read.
-- Use 3-4 sentences maximum per paragraph
-- Limit responses to 3-5 short paragraphs total
-- Get straight to the point with minimal preamble
-- Use short, direct sentences rather than complex ones
-- Prioritize the most relevant information only
-- Avoid unnecessary background information unless explicitly requested
-- For lists, include only 2-4 key points
-- Focus on actionable advice rather than explanations
-
-When responding, please:
-- Break your responses into clear, logical sections
-- Use markdown formatting for better readability (bold, lists, etc.)
-- Label recommendations clearly using **Recommendation:** format
-- For summaries or conclusions, use **Summary:** format
-- Keep paragraphs reasonably short and focused
-- Use bullet points for lists or multiple options
-- Use headings (## or ###) to organize longer responses
-- If providing warnings, mark them with **Warning:**`;
+- Use 2-3 sentences maximum per paragraph
+- Limit responses to 2-4 short paragraphs total
+- Get straight to the point with no preamble
+- Use short, direct sentences
+- Prioritize only the most relevant information
+- Avoid any unnecessary background information
+- For lists, include only 2-3 key points
+- Focus on actionable advice`;
 
   // Add information about health surveys if available
   if (labContext?.survey) {
@@ -208,11 +258,14 @@ Their overall health score is ${labContext.healthScore !== null ? labContext.hea
   systemPrompt += `\n\nYou can reference this lab data when answering the user's questions. If they ask about specific biomarkers not mentioned here, you can check the full results in their categories.
 Be specific when discussing their results, but avoid making definitive medical conclusions.`;
 
+  // Cache the result
+  systemPromptCache.set(contextHash, systemPrompt);
   return systemPrompt;
-}
+});
 
 export async function POST(req: Request) {
   console.log("\n=== CHAT API REQUEST ===");
+  const requestStartTime = Date.now();
   console.log(`Request URL: ${req.url}`);
   console.log(`Request method: ${req.method}`);
   
@@ -240,7 +293,13 @@ export async function POST(req: Request) {
       console.log("Request body successfully parsed");
     } catch (parseError: any) {
       console.error("Failed to parse request JSON:", parseError);
-      throw new Error(`Request parsing error: ${parseError.message || 'Unknown parsing error'}`);
+      return new Response(
+        JSON.stringify({
+          error: "Request parsing error",
+          message: parseError.message || 'Unknown parsing error',
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
     
     const { messages } = messageData;
@@ -253,7 +312,12 @@ export async function POST(req: Request) {
 
     if (!messages || !Array.isArray(messages)) {
       console.error("Invalid messages format:", typeof messages);
-      throw new Error("Invalid messages format")
+      return new Response(
+        JSON.stringify({
+          error: "Invalid messages format",
+        }),
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      );
     }
     
     if (messages.length > 0) {
@@ -261,139 +325,78 @@ export async function POST(req: Request) {
       console.log(`Last message (${lastMessage?.content?.length || 0} chars): "${lastMessage?.content?.substring(0, 50)}..."`);
     }
     
-    // Check for a specified report ID in the request
-    const reportId = messageData.reportId;
-    console.log(`Report ID specified in request: ${reportId || 'none (will use latest)'}`);
+    // Get model settings from request body
+    const { modelSettings = {}, reportId } = messageData;
+    const provider = modelSettings.provider || 'openai';
+    const model = modelSettings.model || 'gpt-4o';
     
-    // Fetch lab context for this user
-    console.log("Fetching lab context...");
-    let labContext = null;
+    // Log model information
+    console.log(`Using model: ${provider} / ${model}`);
+    
+    // Generate simplified system prompt - we'll skip the detailed lab context for now
+    // to avoid the database access issues
+    const systemMessage = {
+      role: "system",
+      content: "You are RuneHealth, a helpful AI health assistant that provides information about health and wellness. Keep responses brief and direct."
+    };
+    
+    // Log time taken to prepare request
+    const prepTime = Date.now() - requestStartTime;
+    console.log(`Request preparation time: ${prepTime}ms`);
+    
+    // Update the OpenAI API request with the system message and directly return the result
+    // This avoids potential response handling issues
     try {
-      // Get the base URL for the API request
-      const baseUrl = new URL(req.url).origin;
-      const contextUrl = new URL(`/api/chat-context${reportId ? `?report_id=${reportId}` : ''}`, baseUrl);
-      
-      console.log(`Fetching context from: ${contextUrl.toString()}`);
-      
-      // Get authorization headers from original request to forward
-      const headers: Record<string, string> = {};
-      const authHeader = req.headers.get('authorization');
-      const cookieHeader = req.headers.get('cookie');
-      
-      if (authHeader) headers['authorization'] = authHeader;
-      if (cookieHeader) headers['cookie'] = cookieHeader;
-      
-      const contextResponse = await fetch(contextUrl, {
-        headers,
-        credentials: 'include',
-        cache: 'no-store'
-      });
-      
-      if (!contextResponse.ok) {
-        console.error(`Failed to fetch lab context: ${contextResponse.status} ${contextResponse.statusText}`);
-        const errorText = await contextResponse.text().catch(() => 'Could not read error response');
-        console.error(`Error response: ${errorText.substring(0, 200)}`);
-        // Create a basic context
-        labContext = { hasResults: false };
-      } else {
-        const contextData = await contextResponse.json();
-        labContext = contextData.context;
-        console.log(`Lab context fetched successfully: ${labContext.hasResults ? 'has results' : 'no results'}`);
-        
-        if (labContext.hasResults) {
-          console.log(`Report: ${labContext.report.labName} (${labContext.report.testDate})`);
-          console.log(`Biomarkers: ${labContext.biomarkers.total} total, ${labContext.biomarkers.abnormal} abnormal`);
-          if (labContext.previousReports) {
-            console.log(`Previous reports: ${labContext.previousReports.length}`);
-          }
-        }
-
-        // Log whether survey data is available
-        if (labContext?.survey) {
-          logger.info("Survey data available for chat", {
-            surveyDate: labContext.survey.completedDate,
-            hasSurveyAIRecs: !!labContext.survey.recommendations?.ai
-          });
-        } else {
-          logger.debug("No survey data available for this chat session");
-        }
-      }
-    } catch (contextError) {
-      console.error("Error fetching lab context:", contextError);
-      // Create a basic context
-      labContext = { hasResults: false };
-    }
-    
-    // Add lab context to message data for subsequent processing
-    messageData.labContext = labContext;
-    
-    console.log("Creating streaming response...");
-    const startTime = Date.now();
-    
-    try {
-      // Try to fetch OpenAI API directly to test connectivity
-      console.log("Testing OpenAI connectivity before streaming...");
-      const testResponse = await fetch("https://api.openai.com/v1/models", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        signal: AbortSignal.timeout(5000) // 5 second timeout
-      });
-      
-      if (testResponse.ok) {
-        console.log("OpenAI connectivity test successful");
-      } else {
-        console.warn(`OpenAI connectivity test failed: ${testResponse.status} ${testResponse.statusText}`);
-      }
-    } catch (testError: any) {
-      console.warn(`OpenAI connectivity test error: ${testError.message || 'Unknown error'}`);
-      // Continue anyway - this is just diagnostic
-    }
-    
-    let streamResult;
-    try {
-      console.log("Calling streamText with messages length:", messages.length);
-      streamResult = streamText({
-        model: openai("gpt-4o-mini"),
-        system: buildSystemPrompt(messageData.labContext),
-        messages,
+      const result = await streamText({
+        model: openai(model),
+        messages: [
+          systemMessage,
+          ...messages
+        ],
         temperature: 0.7,
+        maxTokens: 1000, // Limit token count for faster responses
       });
+
+      // Check if we got a valid response
+      if (!result) {
+        throw new Error("No response generated from AI");
+      }
       
-      console.log(`Stream initialized in ${Date.now() - startTime}ms`);
-    } catch (streamError: any) {
-      console.error("Failed to initialize stream:", streamError);
-      throw new Error(`Stream initialization failed: ${streamError.message || 'Unknown streaming error'}`);
+      // Log completion time
+      const completionTime = Date.now() - requestStartTime;
+      console.log(`Chat completion time: ${completionTime}ms`);
+      console.log(`Successfully generated response`);
+      
+      // Close the logger operation before returning
+      operation.end();
+      
+      console.log("Returning streaming response");
+      // The result from streamText() is already a Response object, so we can return it directly
+      return result;
+    } catch (aiError) {
+      console.error("AI API error:", aiError);
+      throw aiError; // Re-throw to be caught by the outer try/catch
     }
-    
-    operation.end({ status: "success" })
-    
-    console.log("Returning stream response to client");
-    try {
-      const streamResponse = streamResult.toDataStreamResponse();
-      console.log("Stream response created successfully");
-      return streamResponse;
-    } catch (responseError: any) {
-      console.error("Failed to create stream response:", responseError);
-      throw new Error(`Response creation failed: ${responseError.message || 'Unknown response error'}`);
-    }
-  } catch (error) {
-    const errorTime = Date.now();
-    console.error(`[${new Date(errorTime).toISOString()}] Chat error:`, error);
+  } catch (error: any) {
+    const errorTime = Date.now() - requestStartTime;
+    console.error(`[${new Date().toISOString()}] Chat error:`, error);
     
     // Log detailed error information
     const errorDetails = {
       message: error instanceof Error ? error.message : String(error),
       type: error?.constructor?.name || 'Unknown',
       stack: error instanceof Error ? error.stack : undefined,
-      timestamp: new Date(errorTime).toISOString(),
+      timestamp: new Date().toISOString(),
       requestId
     };
     console.error("Error details:", JSON.stringify(errorDetails, null, 2));
     
     operation.fail(error)
-
+    
+    // Log total request time
+    const totalTime = Date.now() - requestStartTime;
+    console.log(`Total request processing time: ${totalTime}ms`);
+    
     return new Response(
       JSON.stringify({
         error: "Failed to process chat request",
@@ -411,7 +414,7 @@ export async function POST(req: Request) {
           "X-Request-ID": requestId
         },
       }
-    )
+    );
   }
 }
 

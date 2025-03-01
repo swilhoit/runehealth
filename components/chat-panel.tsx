@@ -9,12 +9,13 @@ import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Input } from "@/components/ui/input"
-import { Send, ChevronRight, MessageSquare, Beaker, Activity, BadgeInfo, ClipboardList, Copy, Check, Settings } from "lucide-react"
+import { Send, ChevronRight, MessageSquare, Beaker, Activity, BadgeInfo, ClipboardList, Copy, Check, Settings, RefreshCcw } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import { Badge } from "@/components/ui/badge"
 import ReactMarkdown from 'react-markdown'
 import { Gelasio, Albert_Sans, Gilda_Display, Inter } from 'next/font/google'
 import { getModelSettings } from "@/lib/ai-utils"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 
 // Font definitions
 const albertSans = Albert_Sans({
@@ -38,7 +39,7 @@ const gildaDisplay = Gilda_Display({
   variable: '--font-gilda-display',
 })
 
-// Using Inter as a replacement for Geist-Thin
+// Using Inter as a replacement for Geist-Thin (which is no longer needed)
 const inter = Inter({
   subsets: ['latin'],
   weight: ['100', '200', '300', '400'],
@@ -51,10 +52,10 @@ const fontClasses = `${albertSans.variable} ${gelasio.variable} ${gildaDisplay.v
 
 // Define button styles based on the provided design
 const buttonStyles = {
-  primary: "bg-[#CC7756] hover:bg-[#CC7756]/90 text-white",
-  primaryAlt1: "bg-[#7D586A] hover:bg-[#7D586A]/90 text-white",
-  primaryAlt2: "bg-[#86635A] hover:bg-[#86635A]/90 text-white",
-  secondary: "bg-[#9B9B9B] hover:bg-[#9B9B9B]/90 text-white",
+  primary: "bg-[#725556] hover:bg-[#725556]/90 text-white",
+  primaryAlt1: "bg-[#865C69] hover:bg-[#865C69]/90 text-white",
+  primaryAlt2: "bg-[#725556] hover:bg-[#725556]/90 text-white",
+  secondary: "bg-[#865C69] hover:bg-[#865C69]/90 text-white",
   secondaryOutline: "border border-white hover:bg-white/10 text-white bg-transparent",
 };
 
@@ -92,9 +93,9 @@ interface LabContext {
 // Add typing animation component
 const TypingAnimation = () => (
   <div className="flex space-x-1 items-center p-2">
-    <div className="w-2 h-2 rounded-full bg-[#7D586A] animate-bounce" style={{ animationDelay: '0ms' }}></div>
-    <div className="w-2 h-2 rounded-full bg-[#7D586A] animate-bounce" style={{ animationDelay: '150ms' }}></div>
-    <div className="w-2 h-2 rounded-full bg-[#7D586A] animate-bounce" style={{ animationDelay: '300ms' }}></div>
+    <div className="w-2 h-2 rounded-full bg-[#725556] animate-bounce" style={{ animationDelay: '0ms' }}></div>
+    <div className="w-2 h-2 rounded-full bg-[#725556] animate-bounce" style={{ animationDelay: '100ms' }}></div>
+    <div className="w-2 h-2 rounded-full bg-[#725556] animate-bounce" style={{ animationDelay: '200ms' }}></div>
   </div>
 );
 
@@ -153,9 +154,12 @@ export function ChatPanel() {
 
       // Fetch lab context
       try {
-        const contextUrl = currentReportId 
-          ? `/api/chat-context?report_id=${currentReportId}`
-          : '/api/chat-context';
+        // Use relative URL instead of hardcoded localhost URL
+        console.log(`Fetching lab context from: /api/chat-context${currentReportId ? `?report_id=${currentReportId}` : ''}`);
+        
+        // Create the URL dynamically based on the window location
+        const contextUrl = new URL(`/api/chat-context${currentReportId ? `?report_id=${currentReportId}` : ''}`, 
+          typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
         
         console.log(`Fetching lab context from: ${contextUrl}`);
         const response = await fetch(contextUrl);
@@ -266,7 +270,7 @@ export function ChatPanel() {
 
   // Split long messages into multiple chunks for better readability
   const splitMessage = (content: string): string[] => {
-    if (content.length < 200) return [content]; // Lower threshold for short messages
+    if (content.length < 300) return [content]; // Increased threshold for short messages
     
     // Split by double newlines (paragraphs)
     const paragraphs = content.split(/\n\n+/);
@@ -278,8 +282,8 @@ export function ChatPanel() {
       
       for (const paragraph of paragraphs) {
         // Start a new chunk if this would make the current one too long
-        // Use a lower threshold for better readability
-        if (currentChunk.length + paragraph.length > 350) {
+        // Increased threshold for better performance
+        if (currentChunk.length + paragraph.length > 600) {
           if (currentChunk) chunks.push(currentChunk.trim());
           currentChunk = paragraph;
         } else {
@@ -292,19 +296,25 @@ export function ChatPanel() {
     }
     
     // If just one long paragraph, split at sentence boundaries
-    return content
-      .replace(/([.!?])\s+/g, "$1\n\n")
-      .split(/\n\n/)
-      .reduce((chunks: string[], sentence) => {
-        const lastChunk = chunks[chunks.length - 1];
-        // Lower threshold for sentence chunks
-        if (!lastChunk || lastChunk.length + sentence.length > 300) {
-          chunks.push(sentence);
-        } else {
-          chunks[chunks.length - 1] += ". " + sentence;
-        }
-        return chunks;
-      }, []);
+    // Only split extremely long content
+    if (content.length > 1000) {
+      return content
+        .replace(/([.!?])\s+/g, "$1\n\n")
+        .split(/\n\n/)
+        .reduce((chunks: string[], sentence) => {
+          const lastChunk = chunks[chunks.length - 1];
+          // Increased threshold for sentence chunks
+          if (!lastChunk || lastChunk.length + sentence.length > 500) {
+            chunks.push(sentence);
+          } else {
+            chunks[chunks.length - 1] += ". " + sentence;
+          }
+          return chunks;
+        }, []);
+    }
+    
+    // Return as a single chunk if not extremely long
+    return [content];
   }
 
   // Detect message content type for styling
@@ -341,7 +351,7 @@ export function ChatPanel() {
       if (lastMessage.role === 'assistant' && !visibleMessages[lastMessage.id]) {
         const timer = setTimeout(() => {
           setVisibleMessages(prev => ({ ...prev, [lastMessage.id]: true }));
-        }, 500);
+        }, 300);
         
         return () => clearTimeout(timer);
       } else if (lastMessage.role === 'user') {
@@ -379,354 +389,358 @@ export function ChatPanel() {
 
   if (isCollapsed) {
     return (
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className={`${fontClasses} fixed bottom-4 right-4 z-50`}
-      >
-        <Button
-          onClick={toggleCollapse}
-          size="lg"
-          className={`h-14 w-14 rounded-full ${buttonStyles.primary} shadow-lg`}
+      <TooltipProvider>
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className={`${fontClasses} fixed bottom-4 right-4 z-50`}
         >
-          <MessageSquare className="h-6 w-6" />
-          {messages.length > 0 && (
-            <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#7923C] text-white text-xs flex items-center justify-center font-[var(--font-albert-sans)] font-light">
-              {messages.length}
-            </span>
-          )}
-        </Button>
-      </motion.div>
+          <Button
+            onClick={toggleCollapse}
+            size="lg"
+            className={`h-14 w-14 rounded-full ${buttonStyles.primary} shadow-lg`}
+          >
+            <MessageSquare className="h-6 w-6" />
+            {messages.length > 0 && (
+              <span className="absolute -top-1 -right-1 h-5 w-5 rounded-full bg-[#7923C] text-white text-xs flex items-center justify-center font-[var(--font-albert-sans)] font-light">
+                {messages.length}
+              </span>
+            )}
+          </Button>
+        </motion.div>
+      </TooltipProvider>
     )
   }
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ x: "100%" }}
-        animate={{ x: isCollapsed ? "calc(100% - 48px)" : 0 }}
-        transition={{ duration: 0.3 }}
-        className={`${fontClasses} fixed inset-y-0 right-0 w-96 bg-white border-l border-[#CECECE] shadow-lg flex flex-col z-40`}
-      >
-        <div className="flex flex-col h-full">
-          {/* Big Display Title */}
-          <div className="px-4 py-3 text-center border-b border-[#CECECE] bg-[#EDE7DF]">
-            <h1 className="font-[var(--font-inter)] text-2xl text-[#7A828A]">RuneHealth</h1>
-          </div>
-          
-          <div className="flex items-center justify-between px-4 py-2 border-b border-[#CECECE] bg-[#EDE7DF]">
-            <div className="flex items-center space-x-2">
-              <MessageSquare className="h-5 w-5 text-[#7A828A]" />
-              <h2 className="font-[var(--font-gilda-display)] text-xl font-normal text-[#7A828A]">Chat with AI</h2>
+    <TooltipProvider>
+      <AnimatePresence>
+        <motion.div
+          initial={{ x: "100%" }}
+          animate={{ x: isCollapsed ? "calc(100% - 48px)" : 0 }}
+          transition={{ duration: 0.3 }}
+          className={`${fontClasses} fixed inset-y-0 right-0 w-96 bg-[#F4F0EA] border-l border-[#ECE8E6] shadow-lg flex flex-col z-40`}
+        >
+          <div className="flex flex-col h-full">
+            {/* Big Display Title */}
+            <div className="px-4 py-3 text-center border-b border-[#ECE8E6] bg-[#EDE7DF]">
+              {/* Removed RuneHealth heading as requested */}
             </div>
-            <div className="flex items-center space-x-2">
-              {currentReportId && (
-                <span className="font-[var(--font-albert-sans)] text-[10px] font-light text-[#7A828A]">
-                  Report: {currentReportId.substring(0, 8)}...
-                </span>
-              )}
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsCollapsed(!isCollapsed)}
-                className="h-8 w-8 text-[#7A828A] hover:text-[#8A5C87]"
-              >
-                {isCollapsed ? (
-                  <ChevronRight className="h-4 w-4" />
-                ) : (
-                  <ChevronRight className="h-4 w-4 transform rotate-180" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          {/* Model indicator */}
-          {currentModel && (
-            <div className="px-4 py-1 bg-[#EDE7DF] border-b border-[#CECECE] flex justify-between items-center">
-              <div className="flex items-center gap-1">
-                <Settings className="h-3 w-3 text-[#7A828A]" />
-                <span className="font-[var(--font-albert-sans)] text-[10px] font-bold text-[#7A828A]">
-                  AI Model:
-                </span>
-              </div>
-              <Badge 
-                variant="outline" 
-                className="bg-[#CECECE]/20 text-[#7A828A] border-[#7A828A]/50 font-[var(--font-albert-sans)] text-[10px]"
-              >
-                {currentModel.provider.charAt(0).toUpperCase() + currentModel.provider.slice(1)} | {currentModel.model}
-              </Badge>
-            </div>
-          )}
-
-          {/* Lab data context badge & panel toggle */}
-          <div className="flex gap-2 px-4 py-2 bg-[#EDE7DF]">
-            {labContext?.hasResults && (
-              <Badge 
-                variant="outline" 
-                className="bg-[#CECECE]/20 text-[#7A828A] hover:bg-[#CECECE]/30 cursor-pointer transition-colors border-[#7A828A] font-[var(--font-albert-sans)] text-[10px] font-light"
-                onClick={() => setShowLabPanel(!showLabPanel)}
-              >
-                <Beaker className="h-3 w-3 mr-1" />
-                Lab Data
-              </Badge>
-            )}
             
-            {hasSurveyData && (
-              <Badge 
-                variant="outline" 
-                className="bg-[#CECECE]/20 text-[#7A828A] hover:bg-[#CECECE]/30 cursor-pointer transition-colors border-[#7A828A] font-[var(--font-albert-sans)] text-[10px] font-light"
-                onClick={() => setShowSurveyPanel(!showSurveyPanel)}
-              >
-                <ClipboardList className="h-3 w-3 mr-1" />
-                Survey Data
-              </Badge>
-            )}
-          </div>
+            <div className="flex items-center justify-between px-4 py-2 border-b border-[#ECE8E6] bg-[#EDE7DF]">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="h-5 w-5 text-[#7A8084]" />
+                <h2 className="font-heading text-xl font-normal text-[#7A8084]">Rune Assistant</h2>
+              </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="font-[var(--font-albert-sans)] text-[10px] font-light text-[#7A8084]">
+                    (Model: {currentModel ? (currentModel.provider === "gpt-4-turbo" ? "GPT-4 Turbo" : "Claude 3") : "Unknown"})
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <Button 
+                    size="sm" 
+                    variant="ghost" 
+                    onClick={() => {
+                      // Implement model toggle logic here
+                    }}
+                    className="h-8 w-8 text-[#7A8084] hover:text-[#865C69]"
+                  >
+                    <RefreshCcw className="h-3 w-3" />
+                  </Button>
+                </TooltipContent>
+              </Tooltip>
+            </div>
 
-          {/* Lab Context Panel (conditionally shown) */}
-          {showLabPanel && labContext?.hasResults && (
-            <div className="p-3 bg-[#CECECE]/10 border-b border-[#CECECE] font-[var(--font-albert-sans)] text-[10px]">
-              <div className="flex justify-between items-center mb-2">
-                <h4 className="font-[var(--font-gelasio)] text-base font-medium text-[#7A828A]">Lab Results Summary</h4>
-                <span className="font-[var(--font-albert-sans)] text-[10px] font-light text-[#7A828A]/70">{labContext.report?.testDate}</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 mb-2">
-                <div className="bg-white p-2 rounded border border-[#CECECE]">
-                  <div className="text-[#7A828A]/80 font-[var(--font-albert-sans)] text-[10px] font-light">Total Biomarkers</div>
-                  <div className="text-[#7A828A] font-[var(--font-albert-sans)] text-sm font-normal">{labContext.biomarkers?.total}</div>
+            {/* Model indicator */}
+            {currentModel && (
+              <div className="px-4 py-1 bg-[#EDE7DF] border-b border-[#ECE8E6] flex justify-between items-center">
+                <div className="flex items-center gap-1">
+                  <Settings className="h-3 w-3 text-[#7A8084]" />
+                  <span className="font-[var(--font-albert-sans)] text-[10px] font-bold text-[#7A8084]">
+                    AI Model:
+                  </span>
                 </div>
-                <div className="bg-white p-2 rounded border border-[#CECECE]">
-                  <div className="text-[#7A828A]/80 font-[var(--font-albert-sans)] text-[10px] font-light">Abnormal Results</div>
-                  <div className="text-[#7A828A] font-[var(--font-albert-sans)] text-sm font-normal">{labContext.biomarkers?.abnormal}</div>
-                </div>
+                <Badge 
+                  variant="outline" 
+                  className="bg-[#ECE8E6]/20 text-[#7A8084] border-[#7A8084]/50 font-[var(--font-albert-sans)] text-[10px]"
+                >
+                  {currentModel.provider.charAt(0).toUpperCase() + currentModel.provider.slice(1)} | {currentModel.model}
+                </Badge>
               </div>
-              {labContext.biomarkers?.abnormal && labContext.biomarkers.abnormal > 0 && (
-                <div className="mb-2">
-                  <div className="text-[#7A828A]/80 mb-1 font-[var(--font-albert-sans)] text-[10px] font-bold">Abnormal Biomarkers:</div>
-                  <div className="flex flex-wrap gap-1">
-                    {Object.entries(labContext.biomarkers.byCategory).flatMap(([category, biomarkers]) => 
-                      biomarkers
-                        .filter(b => b.in_range === false)
-                        .map(b => (
-                          <Badge key={b.name} variant="outline" className="bg-white border-[#7923C]/30 text-[#7923C] font-[var(--font-albert-sans)] text-[10px] font-light">
-                            {b.name}
-                          </Badge>
-                        ))
+            )}
+
+            {/* Lab data context badge & panel toggle */}
+            <div className="flex gap-2 px-4 py-2 bg-[#EDE7DF]">
+              {labContext?.hasResults && (
+                <Badge 
+                  variant="outline" 
+                  className="bg-[#ECE8E6]/20 text-[#7A8084] hover:bg-[#ECE8E6]/30 cursor-pointer transition-colors border-[#7A8084] font-[var(--font-albert-sans)] text-[10px] font-light"
+                  onClick={() => setShowLabPanel(!showLabPanel)}
+                >
+                  <Beaker className="h-3 w-3 mr-1" />
+                  Lab Data
+                </Badge>
+              )}
+              
+              {hasSurveyData && (
+                <Badge 
+                  variant="outline" 
+                  className="bg-[#ECE8E6]/20 text-[#7A8084] hover:bg-[#ECE8E6]/30 cursor-pointer transition-colors border-[#7A8084] font-[var(--font-albert-sans)] text-[10px] font-light"
+                  onClick={() => setShowSurveyPanel(!showSurveyPanel)}
+                >
+                  <ClipboardList className="h-3 w-3 mr-1" />
+                  Survey Data
+                </Badge>
+              )}
+            </div>
+
+            {/* Lab Context Panel (conditionally shown) */}
+            {showLabPanel && labContext?.hasResults && (
+              <div className="p-3 bg-[#ECE8E6]/10 border-b border-[#ECE8E6] font-[var(--font-albert-sans)] text-[10px]">
+                <div className="flex justify-between items-center mb-2">
+                  <h4 className="font-heading text-base font-normal text-[#7A8084]">Lab Results Summary</h4>
+                  <span className="font-[var(--font-albert-sans)] text-[10px] font-light text-[#7A8084]/70">{labContext.report?.testDate}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 mb-2">
+                  <div className="bg-white p-2 rounded border border-[#ECE8E6]">
+                    <div className="text-[#7A8084]/80 font-[var(--font-albert-sans)] text-[10px] font-light">Total Biomarkers</div>
+                    <div className="text-[#7A8084] font-[var(--font-albert-sans)] text-sm font-normal">{labContext.biomarkers?.total}</div>
+                  </div>
+                  <div className="bg-white p-2 rounded border border-[#ECE8E6]">
+                    <div className="text-[#7A8084]/80 font-[var(--font-albert-sans)] text-[10px] font-light">Abnormal Results</div>
+                    <div className="text-[#7A8084] font-[var(--font-albert-sans)] text-sm font-normal">{labContext.biomarkers?.abnormal}</div>
+                  </div>
+                </div>
+                {labContext.biomarkers?.abnormal && labContext.biomarkers.abnormal > 0 && (
+                  <div className="mb-2">
+                    <div className="text-[#7A8084]/80 mb-1 font-[var(--font-albert-sans)] text-[10px] font-bold">Abnormal Biomarkers:</div>
+                    <div className="flex flex-wrap gap-1">
+                      {Object.entries(labContext.biomarkers.byCategory).flatMap(([category, biomarkers]) => 
+                        biomarkers
+                          .filter(b => b.in_range === false)
+                          .map(b => (
+                            <Badge key={b.name} variant="outline" className="bg-white border-[#7923C]/30 text-[#7923C] font-[var(--font-albert-sans)] text-[10px] font-light">
+                              {b.name}
+                            </Badge>
+                          ))
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Survey Panel */}
+            {showSurveyPanel && hasSurveyData && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="border-t border-[#ECE8E6] bg-[#ECE8E6]/10"
+              >
+                <div className="p-4">
+                  <h3 className="font-heading text-base font-normal text-[#7A8084] mb-2 flex items-center">
+                    <ClipboardList className="h-4 w-4 mr-1 text-[#437D4D]" />
+                    Health Survey Data
+                  </h3>
+                  
+                  <div className="font-[var(--font-albert-sans)] text-[10px] text-[#7A8084] space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="font-light">Survey Date:</span>
+                      <span className="font-normal">{labContext?.survey?.completedDate}</span>
+                    </div>
+                    
+                    {labContext?.survey?.data?.symptoms && labContext.survey.data.symptoms.length > 0 && (
+                      <div>
+                        <span className="font-bold text-[#7A8084]">Symptoms: </span>
+                        <span className="font-light">{labContext?.survey?.data?.symptoms.join(", ")}</span>
+                      </div>
+                    )}
+                    
+                    {labContext?.survey?.data?.sleepQuality !== undefined && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-light">Sleep Quality:</span>
+                        <span className="font-normal">{labContext.survey.data.sleepQuality}/10</span>
+                      </div>
+                    )}
+                    
+                    {labContext?.survey?.data?.stressLevel !== undefined && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-light">Stress Level:</span>
+                        <span className="font-normal">{labContext.survey.data.stressLevel}/10</span>
+                      </div>
+                    )}
+                    
+                    {labContext?.survey?.data?.exerciseFrequency !== undefined && (
+                      <div className="flex items-center justify-between">
+                        <span className="font-light">Exercise:</span>
+                        <span className="font-normal">{labContext.survey.data.exerciseFrequency} days/week</span>
+                      </div>
+                    )}
+                    
+                    {labContext?.survey?.recommendations?.ai?.summary && (
+                      <div className="mt-2 pt-2 border-t border-[#ECE8E6]">
+                        <p className="font-[var(--font-albert-sans)] text-[10px] italic font-light text-[#7A8084]">{labContext.survey.recommendations.ai.summary}</p>
+                      </div>
                     )}
                   </div>
                 </div>
-              )}
-            </div>
-          )}
+              </motion.div>
+            )}
 
-          {/* Survey Panel */}
-          {showSurveyPanel && hasSurveyData && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              className="border-t border-[#CECECE] bg-[#CECECE]/10"
-            >
-              <div className="p-4">
-                <h3 className="font-[var(--font-gelasio)] text-base font-medium text-[#7A828A] mb-2 flex items-center">
-                  <ClipboardList className="h-4 w-4 mr-1 text-[#437D4D]" />
-                  Health Survey Data
-                </h3>
-                
-                <div className="font-[var(--font-albert-sans)] text-[10px] text-[#7A828A] space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="font-light">Survey Date:</span>
-                    <span className="font-normal">{labContext?.survey?.completedDate}</span>
-                  </div>
-                  
-                  {labContext?.survey?.data?.symptoms && labContext.survey.data.symptoms.length > 0 && (
-                    <div>
-                      <span className="font-bold text-[#7A828A]">Symptoms: </span>
-                      <span className="font-light">{labContext?.survey?.data?.symptoms.join(", ")}</span>
-                    </div>
-                  )}
-                  
-                  {labContext?.survey?.data?.sleepQuality !== undefined && (
-                    <div className="flex items-center justify-between">
-                      <span className="font-light">Sleep Quality:</span>
-                      <span className="font-normal">{labContext.survey.data.sleepQuality}/10</span>
-                    </div>
-                  )}
-                  
-                  {labContext?.survey?.data?.stressLevel !== undefined && (
-                    <div className="flex items-center justify-between">
-                      <span className="font-light">Stress Level:</span>
-                      <span className="font-normal">{labContext.survey.data.stressLevel}/10</span>
-                    </div>
-                  )}
-                  
-                  {labContext?.survey?.data?.exerciseFrequency !== undefined && (
-                    <div className="flex items-center justify-between">
-                      <span className="font-light">Exercise:</span>
-                      <span className="font-normal">{labContext.survey.data.exerciseFrequency} days/week</span>
-                    </div>
-                  )}
-                  
-                  {labContext?.survey?.recommendations?.ai?.summary && (
-                    <div className="mt-2 pt-2 border-t border-[#CECECE]">
-                      <p className="font-[var(--font-albert-sans)] text-[10px] italic font-light text-[#7A828A]">{labContext.survey.recommendations.ai.summary}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </motion.div>
-          )}
-
-          {/* Messages */}
-          <ScrollArea className="flex-1 p-4">
-            <div className="space-y-4">
-              {messages.map((message) => {
-                if (message.role === "user") {
-                  // Render user message normally
-                  return (
-                    <div
-                      key={message.id}
-                      className="flex items-start gap-3 flex-row-reverse"
-                    >
-                      <Avatar className="w-8 h-8 bg-[#CECECE]/30 text-[#7A828A]">
-                        <AvatarImage src="/placeholder.svg" />
-                        <AvatarFallback className="font-[var(--font-albert-sans)]">
-                          {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="rounded-lg px-3 py-2 max-w-[85%] font-[var(--font-albert-sans)] text-sm font-normal bg-[#7D586A] text-white ml-auto">
-                        {message.content}
+            {/* Messages */}
+            <ScrollArea className="flex-1 p-4 bg-[#F4F0EA]">
+              <div className="space-y-4">
+                {messages.map((message) => {
+                  if (message.role === "user") {
+                    // Render user message normally
+                    return (
+                      <div
+                        key={message.id}
+                        className="flex items-start gap-3 flex-row-reverse"
+                      >
+                        <Avatar className="w-8 h-8 bg-[#ECE8E6]/30 text-[#7A8084]">
+                          <AvatarImage src="/placeholder.svg" />
+                          <AvatarFallback className="font-[var(--font-albert-sans)]">
+                            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="rounded-lg px-3 py-2 max-w-[85%] font-[var(--font-albert-sans)] text-sm font-normal bg-[#725556] text-white ml-auto">
+                          {message.content}
+                        </div>
                       </div>
-                    </div>
-                  );
-                } else {
-                  // Split assistant messages into chunks
-                  const messageChunks = splitMessage(message.content);
-                  
-                  return (
-                    <div key={message.id} className="space-y-2 message-group">
-                      {messageChunks.map((chunk, index) => {
-                        const contentType = getMessageStyle(chunk);
-                        const formattedChunk = formatMessage(chunk);
-                        
-                        return (
-                          <div
-                            key={`${message.id}-${index}`}
-                            className="flex items-start gap-3 group"
-                          >
-                            {index === 0 && (
-                              <Avatar className="w-8 h-8">
-                                <AvatarImage src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Avatar-7Wuy3DH9iB7mlmqBrV9FA7z6JagBfk.png" />
-                                <AvatarFallback>AI</AvatarFallback>
-                              </Avatar>
-                            )}
-                            {index > 0 && <div className="w-8" />}
-                            <div className="relative">
-                              <div
-                                className={`rounded-lg px-3 py-2 max-w-[85%] font-albert-sans text-sm font-normal ${
-                                  contentType === 'warning' ? 'bg-[#9F7D20]/10 border border-[#9F7D20]/20 text-[#9F7D20]' :
-                                  contentType === 'recommendation' ? 'bg-[#437D4D]/10 border border-[#437D4D]/20 text-[#437D4D]' :
-                                  contentType === 'summary' ? 'bg-[#8A5C87]/10 border border-[#8A5C87]/20 text-[#8A5C87] font-medium' :
-                                  contentType === 'list' ? 'bg-[#CECECE]/10 border border-[#CECECE] text-[#7A828A]' :
-                                  contentType === 'code' ? 'bg-[#CECECE]/20 border border-[#CECECE] text-[#7A828A] font-mono' :
-                                  'bg-[#CECECE]/10 text-[#7A828A]'
-                                } ${contentType !== 'code' ? 'bg-opacity-90 bg-[url("/message-pattern.png")] bg-cover' : ''}`}
-                              >
-                                {visibleMessages[message.id] ? (
-                                  <div className="prose prose-sm max-w-none prose-headings:font-[var(--font-gelasio)] prose-headings:font-medium prose-stone dark:prose-invert prose-p:mb-2 prose-p:leading-relaxed prose-li:mb-1 prose-p:font-[var(--font-albert-sans)] prose-li:font-[var(--font-albert-sans)]">
-                                    <ReactMarkdown>{formattedChunk}</ReactMarkdown>
-                                  </div>
-                                ) : (
-                                  <TypingAnimation />
+                    );
+                  } else {
+                    // Split assistant messages into chunks
+                    const messageChunks = splitMessage(message.content);
+                    
+                    return (
+                      <div key={message.id} className="space-y-2 message-group">
+                        {messageChunks.map((chunk, index) => {
+                          const contentType = getMessageStyle(chunk);
+                          const formattedChunk = formatMessage(chunk);
+                          
+                          return (
+                            <div
+                              key={`${message.id}-${index}`}
+                              className="flex items-start gap-3 group"
+                            >
+                              {index === 0 && (
+                                <Avatar className="w-8 h-8">
+                                  <AvatarImage src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Avatar-7Wuy3DH9iB7mlmqBrV9FA7z6JagBfk.png" />
+                                  <AvatarFallback>AI</AvatarFallback>
+                                </Avatar>
+                              )}
+                              {index > 0 && <div className="w-8" />}
+                              <div className="relative">
+                                <div
+                                  className={`rounded-lg px-3 py-2 max-w-[85%] font-albert-sans text-sm font-normal ${
+                                    contentType === 'warning' ? 'bg-[#9F7D20]/10 border border-[#9F7D20]/20 text-[#9F7D20]' :
+                                    contentType === 'recommendation' ? 'bg-[#437D4D]/10 border border-[#437D4D]/20 text-[#437D4D]' :
+                                    contentType === 'summary' ? 'bg-[#8A5C87]/10 border border-[#8A5C87]/20 text-[#8A5C87] font-medium' :
+                                    contentType === 'list' ? 'bg-[#ECE8E6]/10 border border-[#ECE8E6] text-[#7A8084]' :
+                                    contentType === 'code' ? 'bg-[#ECE8E6]/20 border border-[#ECE8E6] text-[#7A8084] font-mono' :
+                                    'bg-[#ECE8E6]/10 text-[#7A8084]'
+                                  } ${contentType !== 'code' ? 'bg-opacity-90 bg-[url("/message-pattern.png")] bg-cover' : ''}`}
+                                >
+                                  {visibleMessages[message.id] ? (
+                                    <div className="prose prose-sm max-w-none prose-headings:font-[var(--font-gelasio)] prose-headings:font-medium prose-stone dark:prose-invert prose-p:mb-2 prose-p:leading-relaxed prose-li:mb-1 prose-p:font-[var(--font-albert-sans)] prose-li:font-[var(--font-albert-sans)]">
+                                      <ReactMarkdown>{formattedChunk}</ReactMarkdown>
+                                    </div>
+                                  ) : (
+                                    <TypingAnimation />
+                                  )}
+                                </div>
+                                
+                                {/* Copy button */}
+                                {visibleMessages[message.id] && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                    onClick={() => copyToClipboard(chunk, `${message.id}-${index}`)}
+                                    title="Copy to clipboard"
+                                  >
+                                    {copiedMessageId === `${message.id}-${index}` ? (
+                                      <Check className="h-3 w-3 text-[#437D4D]" />
+                                    ) : (
+                                      <Copy className="h-3 w-3 text-[#7A8084]/70" />
+                                    )}
+                                  </Button>
                                 )}
                               </div>
-                              
-                              {/* Copy button */}
-                              {visibleMessages[message.id] && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                  onClick={() => copyToClipboard(chunk, `${message.id}-${index}`)}
-                                  title="Copy to clipboard"
-                                >
-                                  {copiedMessageId === `${message.id}-${index}` ? (
-                                    <Check className="h-3 w-3 text-[#437D4D]" />
-                                  ) : (
-                                    <Copy className="h-3 w-3 text-[#7A828A]/70" />
-                                  )}
-                                </Button>
-                              )}
                             </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  );
-                }
-              })}
-              <div ref={messagesEndRef} />
-            </div>
-          </ScrollArea>
-
-          {/* Input */}
-          <div className="p-4 border-t border-[#CECECE] bg-white">
-            <form onSubmit={handleFormSubmit} className="flex gap-2">
-              <Input
-                placeholder="Type your message... (or /model to check AI model)"
-                value={input}
-                onChange={handleInputChange}
-                disabled={isLoading}
-                className="flex-1 border-[#CECECE] focus-visible:ring-[#CC7756] font-[var(--font-albert-sans)] text-sm"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    if (input.trim()) {
-                      handleFormSubmit(e as any);
-                    }
-                    e.preventDefault();
+                          );
+                        })}
+                      </div>
+                    );
                   }
-                }}
-              />
-              <Button 
-                type="submit" 
-                size="icon" 
-                disabled={isLoading || !input.trim()} 
-                className={buttonStyles.primary}
-              >
-                <Send className="h-4 w-4" />
-              </Button>
-            </form>
-            <div className="mt-2 font-[var(--font-albert-sans)] text-[10px] font-light text-[#7A828A] flex items-center justify-between">
-              <div className="flex items-center">
-                <BadgeInfo className="h-3 w-3 mr-1" />
-                <span>
-                  {currentModel ? (
-                    <>
-                      <span className="font-medium">{currentModel.provider.charAt(0).toUpperCase() + currentModel.provider.slice(1)}</span> has access to
-                    </>
-                  ) : (
-                    <>AI has access to</>
-                  )}
-                </span>
-                {labContext?.hasResults && <span className="ml-1">lab data</span>}
-                {labContext?.hasResults && hasSurveyData && <span className="mx-1">+</span>}
-                {hasSurveyData && <span className="ml-1">health survey</span>}
+                })}
+                <div ref={messagesEndRef} />
               </div>
-              {(messages.length > 0) && (
+            </ScrollArea>
+
+            {/* Input */}
+            <div className="p-4 border-t border-[#ECE8E6] bg-white">
+              <form onSubmit={handleFormSubmit} className="flex gap-2">
+                <Input
+                  placeholder="Type your message... (or /model to check AI model)"
+                  value={input}
+                  onChange={handleInputChange}
+                  disabled={isLoading}
+                  className="flex-1 border-[#ECE8E6] focus-visible:ring-[#CC7756] font-[var(--font-albert-sans)] text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      if (input.trim()) {
+                        handleFormSubmit(e as any);
+                      }
+                      e.preventDefault();
+                    }
+                  }}
+                />
                 <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-6 font-[var(--font-albert-sans)] text-[10px] font-bold text-[#7A828A] hover:text-[#CC7756]"
-                  onClick={() => setMessages([])}
+                  type="submit" 
+                  size="icon" 
+                  disabled={isLoading || !input.trim()} 
+                  className={buttonStyles.primary}
                 >
-                  Clear chat
+                  <Send className="h-4 w-4" />
                 </Button>
-              )}
+              </form>
+              <div className="mt-2 font-[var(--font-albert-sans)] text-[10px] font-light text-[#7A8084] flex items-center justify-between">
+                <div className="flex items-center">
+                  <BadgeInfo className="h-3 w-3 mr-1" />
+                  <span>
+                    {currentModel ? (
+                      <>
+                        <span className="font-medium">{currentModel.provider.charAt(0).toUpperCase() + currentModel.provider.slice(1)}</span> has access to
+                      </>
+                    ) : (
+                      <>AI has access to</>
+                    )}
+                  </span>
+                  {labContext?.hasResults && <span className="ml-1">lab data</span>}
+                  {labContext?.hasResults && hasSurveyData && <span className="mx-1">+</span>}
+                  {hasSurveyData && <span className="ml-1">health survey</span>}
+                </div>
+                {(messages.length > 0) && (
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="h-6 font-[var(--font-albert-sans)] text-[10px] font-bold text-[#7A8084] hover:text-[#CC7756]"
+                    onClick={() => setMessages([])}
+                  >
+                    Clear chat
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
-        </div>
-      </motion.div>
-    </AnimatePresence>
+        </motion.div>
+      </AnimatePresence>
+    </TooltipProvider>
   )
 }
 

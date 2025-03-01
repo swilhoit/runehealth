@@ -27,6 +27,7 @@ export default function DashboardPage() {
         const { data: { session } } = await supabase.auth.getSession()
         if (!session) return
 
+        // Using supabase client directly, all headers are configured in lib/supabase/client.ts
         // Get user profile
         const { data: profile } = await supabase
           .from("profiles")
@@ -111,8 +112,8 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-4xl font-thin text-sand-900 mb-2">
+      <div className="p-4 rounded-lg bg-[#EDE7DF]">
+        <h1 className="text-4xl font-heading font-normal text-sand-900 mb-2">
           {activityData.loading 
             ? "Loading..." 
             : `Welcome, ${userProfile?.full_name || "User"}`
@@ -129,10 +130,10 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3 }}
         >
-          <Card className="border-terra-100 h-full">
+          <Card className="border-[#EDE7DF] h-full">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xl font-medium flex items-center gap-2">
-                <FileText className="h-5 w-5 text-terra-600" />
+              <CardTitle className="text-xl font-heading font-normal flex items-center gap-2">
+                <FileText className="h-5 w-5 text-[#725556]" />
                 Lab Results
               </CardTitle>
               <CardDescription>
@@ -153,7 +154,7 @@ export default function DashboardPage() {
             </CardContent>
             <CardFooter className="flex flex-col space-y-2">
               <Button 
-                className="w-full bg-terra-600 hover:bg-terra-700 text-white"
+                className="w-full bg-[#725556] hover:bg-[#725556]/90 text-white"
                 asChild
               >
                 <Link href="/dashboard/upload-labs">
@@ -164,7 +165,7 @@ export default function DashboardPage() {
               {activityData.labsCount > 0 && (
                 <Button 
                   variant="outline" 
-                  className="w-full" 
+                  className="w-full border-[#725556] text-[#725556] hover:bg-[#725556]/10" 
                   asChild
                 >
                   <Link href="/dashboard/labs">
@@ -182,10 +183,10 @@ export default function DashboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.3, delay: 0.1 }}
         >
-          <Card className="border-terra-100 h-full">
+          <Card className="border-[#EDE7DF] h-full">
             <CardHeader className="pb-2">
-              <CardTitle className="text-xl font-medium flex items-center gap-2">
-                <ClipboardList className="h-5 w-5 text-terra-600" />
+              <CardTitle className="text-xl font-heading font-normal flex items-center gap-2">
+                <ClipboardList className="h-5 w-5 text-[#725556]" />
                 Health Surveys
               </CardTitle>
               <CardDescription>
@@ -206,7 +207,7 @@ export default function DashboardPage() {
             </CardContent>
             <CardFooter className="flex flex-col space-y-2">
               <Button 
-                className="w-full bg-terra-600 hover:bg-terra-700 text-white"
+                className="w-full bg-[#725556] hover:bg-[#725556]/90 text-white"
                 asChild
               >
                 <Link href="/dashboard/health-survey">
@@ -217,7 +218,7 @@ export default function DashboardPage() {
               {activityData.surveysCount > 0 && (
                 <Button 
                   variant="outline" 
-                  className="w-full" 
+                  className="w-full border-[#725556] text-[#725556] hover:bg-[#725556]/10" 
                   asChild
                 >
                   <Link href="/dashboard/reports">
@@ -236,20 +237,20 @@ export default function DashboardPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: 0.2 }}
       >
-        <Card className="border-terra-100">
+        <Card className="border-[#EDE7DF]">
           <CardHeader>
-            <CardTitle className="text-xl font-medium flex items-center gap-2">
-              <Zap className="h-5 w-5 text-terra-600" />
+            <CardTitle className="text-xl font-heading font-normal flex items-center gap-2">
+              <Zap className="h-5 w-5 text-[#725556]" />
               Quick Actions
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <Link href="/dashboard/upload-labs">
-                <Card className="border border-terra-100 hover:border-terra-300 hover:shadow-md transition-all cursor-pointer h-full">
+                <Card className="border border-[#EDE7DF] hover:border-[#725556]/30 hover:shadow-md transition-all cursor-pointer h-full">
                   <CardContent className="pt-6">
                     <div className="flex flex-col items-center text-center">
-                      <Upload className="h-8 w-8 text-terra-600 mb-2" />
+                      <Upload className="h-8 w-8 text-[#725556] mb-2" />
                       <h3 className="font-medium text-sand-900">Upload Labs</h3>
                       <p className="text-xs text-sand-500 mt-1">Upload and analyze new lab results</p>
                     </div>
@@ -258,10 +259,10 @@ export default function DashboardPage() {
               </Link>
               
               <Link href="/dashboard/health-survey">
-                <Card className="border border-terra-100 hover:border-terra-300 hover:shadow-md transition-all cursor-pointer h-full">
+                <Card className="border border-[#EDE7DF] hover:border-[#725556]/30 hover:shadow-md transition-all cursor-pointer h-full">
                   <CardContent className="pt-6">
                     <div className="flex flex-col items-center text-center">
-                      <ClipboardList className="h-8 w-8 text-terra-600 mb-2" />
+                      <ClipboardList className="h-8 w-8 text-[#725556] mb-2" />
                       <h3 className="font-medium text-sand-900">Take Survey</h3>
                       <p className="text-xs text-sand-500 mt-1">Complete your health assessment</p>
                     </div>
@@ -270,10 +271,10 @@ export default function DashboardPage() {
               </Link>
               
               <Link href="/dashboard/reports">
-                <Card className="border border-terra-100 hover:border-terra-300 hover:shadow-md transition-all cursor-pointer h-full">
+                <Card className="border border-[#EDE7DF] hover:border-[#725556]/30 hover:shadow-md transition-all cursor-pointer h-full">
                   <CardContent className="pt-6">
                     <div className="flex flex-col items-center text-center">
-                      <TrendingUp className="h-8 w-8 text-terra-600 mb-2" />
+                      <TrendingUp className="h-8 w-8 text-[#725556] mb-2" />
                       <h3 className="font-medium text-sand-900">View Reports</h3>
                       <p className="text-xs text-sand-500 mt-1">See your health insights and trends</p>
                     </div>

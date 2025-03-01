@@ -122,21 +122,33 @@ export async function GET(request: Request) {
     
     // Get health score
     console.log("Fetching health score...");
-    const { data: healthScore, error: healthScoreError } = await supabase
-      .from("health_scores")
-      .select("score")
-      .eq("report_id", latestReport.id)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single()
+    let healthScore = null;
     
-    if (healthScoreError && healthScoreError.code !== 'PGRST116') {
-      console.error("Error fetching health score:", healthScoreError);
-      logger.error("Failed to fetch health score", { error: healthScoreError });
+    try {
+      const { data: healthScoreData, error: healthScoreError } = await supabase
+        .from("health_scores")
+        .select("score")
+        .eq("report_id", latestReport.id)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      
+      if (healthScoreError) {
+        console.log("Error fetching health score:", healthScoreError);
+        // Log the error but continue without a health score
+      } else if (healthScoreData && healthScoreData.length > 0) {
+        healthScore = healthScoreData[0].score;
+      }
+    } catch (error) {
+      console.error("Error fetching health score:", error);
+      logger.error("Failed to fetch health score", { 
+        requestId, userId: session.user.id, error: { 
+          message: String(error), 
+          metadata: { rawError: error } 
+        } 
+      });
     }
     
-    const score = healthScore?.score || null
-    console.log(`Health score: ${score !== null ? score : 'not available'}`);
+    console.log(`Health score: ${healthScore !== null ? healthScore : 'not available'}`);
     
     // Format test date
     const testDate = latestReport.test_date 
@@ -183,7 +195,7 @@ export async function GET(request: Request) {
           byCategory: biomarkersByCategory,
         },
         insights: insightsByType,
-        healthScore: score,
+        healthScore: healthScore,
         requestId
       }
     };
@@ -191,42 +203,48 @@ export async function GET(request: Request) {
     // Fetch the latest health survey for this user
     console.log("Fetching latest health survey data...");
     try {
-      const { data: latestSurvey, error: surveyError } = await supabase
-        .from("survey_results")
-        .select("*")
-        .eq("user_id", session.user.id)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
+      try {
+        const { data: latestSurvey, error: surveyError } = await supabase
+          .from("survey_results")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .single();
 
-      if (surveyError && surveyError.code !== 'PGRST116') {
-        console.error("Error fetching health survey:", surveyError);
-        logger.warn("Failed to fetch health survey", { error: surveyError });
+        if (surveyError && surveyError.code !== 'PGRST116') {
+          console.error("Error fetching health survey:", surveyError);
+          logger.warn("Failed to fetch health survey", { error: surveyError });
+          // Continue without survey data
+        } else if (latestSurvey) {
+          console.log("Found health survey data from:", new Date(latestSurvey.created_at).toLocaleDateString());
+          
+          // Format the survey completion date
+          const surveyDate = new Date(latestSurvey.created_at).toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'long', 
+            day: 'numeric' 
+          });
+          
+          // Add survey data to context
+          contextResponse.context.survey = {
+            id: latestSurvey.id,
+            completedDate: surveyDate,
+            data: latestSurvey.survey_data,
+            recommendations: latestSurvey.recommendations
+          };
+          
+          logger.info("Added survey data to chat context", {
+            surveyId: latestSurvey.id,
+            surveyDate: surveyDate
+          });
+        } else {
+          console.log("No health survey data found");
+        }
+      } catch (err) {
+        console.error("Exception accessing survey_results table:", err);
+        logger.warn("Exception accessing health survey data", { error: String(err) });
         // Continue without survey data
-      } else if (latestSurvey) {
-        console.log("Found health survey data from:", new Date(latestSurvey.created_at).toLocaleDateString());
-        
-        // Format the survey completion date
-        const surveyDate = new Date(latestSurvey.created_at).toLocaleDateString('en-US', { 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        });
-        
-        // Add survey data to context
-        contextResponse.context.survey = {
-          id: latestSurvey.id,
-          completedDate: surveyDate,
-          data: latestSurvey.survey_data,
-          recommendations: latestSurvey.recommendations
-        };
-        
-        logger.info("Added survey data to chat context", {
-          surveyId: latestSurvey.id,
-          surveyDate: surveyDate
-        });
-      } else {
-        console.log("No health survey data found");
       }
     } catch (surveyFetchError) {
       console.error("Exception fetching health survey:", surveyFetchError);
@@ -302,7 +320,7 @@ export async function GET(request: Request) {
     logger.info("Successfully generated chat context", {
       biomarkerCount: biomarkers.length,
       abnormalCount: biomarkers.filter(b => !b.in_range).length,
-      hasHealthScore: score !== null,
+      hasHealthScore: healthScore !== null,
       reportId: latestReport.id,
       hasPreviousReports: !!contextResponse.context.previousReports
     });

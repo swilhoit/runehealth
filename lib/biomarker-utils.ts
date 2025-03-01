@@ -29,7 +29,18 @@ export const biomarkerCodeMap: Record<string, string> = {
   "b12": "vitaminb12",
   "folate": "folate",
   "folic acid": "folate",
-
+  // Added mappings for common parsing issues
+  "serum folate": "folate",
+  "folate concentration": "folate",
+  "folateconcentration": "folate",
+  "aserumfolate": "folate",
+  "serumfolate": "folate",
+  "folate lessthan": "folate",
+  "vitamin d less than": "vitamind",
+  "vitamindlessthan": "vitamind",
+  "ohvitamind": "vitamind",
+  "oh vitamin d": "vitamind",
+  
   // Cholesterol panel
   "total cholesterol": "cholesterol",
   "cholesterol total": "cholesterol", 
@@ -43,6 +54,11 @@ export const biomarkerCodeMap: Record<string, string> = {
   "low density lipoprotein": "ldl",
   "triglycerides": "triglycerides",
   "trig": "triglycerides",
+  "vldl cholesterol": "vldl",
+  "vldlcholesterol": "vldl",
+  "ldlcholesterol": "ldl",
+  "ldlcholcalc": "ldl",
+  "hdlcholesterol": "hdl",
   
   // Thyroid panel
   "tsh": "tsh",
@@ -113,6 +129,112 @@ export const biomarkerCodeMap: Record<string, string> = {
 }
 
 /**
+ * Segments run-together words by known biomarker terms
+ * @param text The text to segment
+ * @returns Segmented text with spaces between recognized terms
+ */
+export function segmentWords(text: string): string {
+  // For long words, try to segment them by known biomarker terms
+  if (text.length > 15) {
+    const knownTerms = [
+      "serum", "plasma", "vitamin", "cholesterol", "concentration", 
+      "lessthan", "less", "than", "blood", "urine", "total", 
+      "hdl", "ldl", "vldl", "calc", "ratio", "level", "direct", "free"
+    ];
+    
+    let result = text.toLowerCase();
+    for (const term of knownTerms) {
+      // Use positive lookahead/lookbehind to avoid multiple replacements
+      const regex = new RegExp(`(?<![a-z])${term}(?![a-z])|(?<=[a-z])${term}(?![a-z])|(?<![a-z])${term}(?=[a-z])`, "gi");
+      result = result.replace(regex, ` ${term} `);
+    }
+    
+    return result.replace(/\s+/g, " ").trim();
+  }
+  return text;
+}
+
+/**
+ * Calculates string similarity using Levenshtein distance
+ * @param str1 First string to compare
+ * @param str2 Second string to compare
+ * @returns Similarity score between 0 and 1
+ */
+export function calculateSimilarity(str1: string, str2: string): number {
+  const longer = str1.length > str2.length ? str1 : str2;
+  const shorter = str1.length > str2.length ? str2 : str1;
+  
+  if (longer.length === 0) {
+    return 1.0;
+  }
+  
+  // Calculate Levenshtein distance
+  const costs = [];
+  for (let i = 0; i <= longer.length; i++) {
+    let lastValue = i;
+    for (let j = 0; j <= shorter.length; j++) {
+      if (i === 0) {
+        costs[j] = j;
+      } else if (j > 0) {
+        let newValue = costs[j - 1];
+        if (longer.charAt(i - 1) !== shorter.charAt(j - 1)) {
+          newValue = Math.min(Math.min(newValue, lastValue), costs[j]) + 1;
+        }
+        costs[j - 1] = lastValue;
+        lastValue = newValue;
+      }
+    }
+    if (i > 0) {
+      costs[shorter.length] = lastValue;
+    }
+  }
+  
+  // Return similarity as a value between 0 and 1
+  return (longer.length - costs[shorter.length]) / longer.length;
+}
+
+/**
+ * Perform fuzzy matching to find the best biomarker match
+ * @param input The input string to match
+ * @param threshold Similarity threshold (0-1)
+ * @param logger Optional logger
+ * @returns The matched biomarker code or null if no match
+ */
+export function fuzzyMatchBiomarker(input: string, threshold = 0.7, logger?: any): string | null {
+  const normalized = normalizeBiomarkerCode(input);
+  let bestMatch = null;
+  let bestScore = threshold; // Must exceed threshold
+  
+  // Try matching against biomarker code map
+  for (const [name, code] of Object.entries(biomarkerCodeMap)) {
+    const similarity = calculateSimilarity(normalized, normalizeBiomarkerCode(name));
+    if (similarity > bestScore) {
+      bestMatch = code;
+      bestScore = similarity;
+      
+      if (logger) {
+        logger.debug(`Fuzzy match: "${input}" -> "${name}" (score: ${similarity.toFixed(2)}, code: ${code})`);
+      }
+    }
+  }
+  
+  // Also try direct matching with known codes
+  for (const code of knownBiomarkerCodes) {
+    const similarity = calculateSimilarity(normalized, code);
+    if (similarity > bestScore) {
+      bestMatch = code;
+      bestScore = similarity;
+      
+      if (logger) {
+        logger.debug(`Fuzzy match with code: "${input}" -> "${code}" (score: ${similarity.toFixed(2)})`);
+      }
+    }
+  }
+  
+  return bestMatch;
+}
+
+/**
  * Finds the normalized biomarker code from various input formats
  * @param input The biomarker name or code to normalize
  * @param logger Optional logger for debug info
@@ -121,6 +243,26 @@ export const biomarkerCodeMap: Record<string, string> = {
 export function findBiomarkerCode(input: string, logger?: any): string {
   const originalInput = input;
   const normalized = input.toLowerCase().trim();
+  
+  // Attempt to segment run-together words first
+  const segmented = segmentWords(normalized);
+  if (segmented !== normalized) {
+    if (logger) {
+      logger.debug(`Segmented "${normalized}" into "${segmented}"`);
+    }
+    
+    // Check if segmented version has a direct match
+    if (biomarkerCodeMap[segmented]) {
+      if (logger) {
+        logger.debug(`Match found for segmented term "${segmented}"`, {
+          original: originalInput,
+          segmented: segmented,
+          matchedCode: biomarkerCodeMap[segmented]
+        });
+      }
+      return biomarkerCodeMap[segmented];
+    }
+  }
   
   // Try direct match in the map first
   if (biomarkerCodeMap[normalized]) {
@@ -136,6 +278,18 @@ export function findBiomarkerCode(input: string, logger?: any): string {
   
   // If not found, normalize and try again
   const fullyNormalized = normalizeBiomarkerCode(input);
+  
+  // Try fuzzy matching if no direct match found
+  const fuzzyMatch = fuzzyMatchBiomarker(input, 0.75, logger);
+  if (fuzzyMatch) {
+    if (logger) {
+      logger.debug(`Fuzzy match found for "${originalInput}"`, {
+        input: originalInput,
+        fuzzyMatch: fuzzyMatch
+      });
+    }
+    return fuzzyMatch;
+  }
   
   // Log the process
   if (logger) {
@@ -273,7 +427,19 @@ export async function isValidBiomarkerName(biomarkerName: string, logger?: any):
     /\bweight\b/i,              // Weight mentions (unless specifically measuring weight)
     /\bdr\.?\b/i,               // Doctor mentions
     /\bm\.?d\.?\b/i,            // MD mentions
+    /^a(serum|plasma|blood|urine)/i,  // Likely an article before the actual biomarker
+    /lessthan$/i,               // Likely just a reference range description
+    /^(of|and|the|in|by|with|for|to|at|from|on)\b/i, // Starting with common prepositions/articles
+    /[^\w\s\(\)\/\-\+\.\,\:]\w+/i, // Contains unusual symbols
+    /[a-z]*\d{5,}[a-z]*/i,      // Contains long number sequences
+    /^test\b/i,                 // Starts with "test"
+    /\btest result\b/i,         // Contains "test result"
+    /\bcomment\b/i,             // Contains "comment"
+    /\bflag\b/i,                // Contains "flag"
   ];
+  
+  // Try to segment potential runs of words without spaces
+  const segmented = segmentWords(normalized);
   
   // Check if the name matches any false positive patterns
   for (const pattern of falseBiomarkerPatterns) {
@@ -292,6 +458,17 @@ export async function isValidBiomarkerName(biomarkerName: string, logger?: any):
       logger.debug(`Validated biomarker - found in known list: "${biomarkerName}" (code: ${code})`);
     }
     return true;
+  }
+  
+  // Try with segmented version if different
+  if (segmented !== normalized) {
+    const segmentedCode = findBiomarkerCode(segmented, logger);
+    if (knownBiomarkerCodes.has(segmentedCode)) {
+      if (logger) {
+        logger.debug(`Validated segmented biomarker: "${biomarkerName}" -> "${segmented}" (code: ${segmentedCode})`);
+      }
+      return true;
+    }
   }
   
   // If not in hardcoded list, check database reference table (slower but more comprehensive)
@@ -313,6 +490,23 @@ export async function isValidBiomarkerName(biomarkerName: string, logger?: any):
         return true;
       }
     }
+    
+    // Check segmented version against database
+    if (segmented !== normalized) {
+      const segmentedNormalized = normalizeBiomarkerCode(segmented);
+      for (const [refCode, biomarker] of Object.entries(references)) {
+        if (
+          segmentedNormalized === refCode || 
+          segmentedNormalized.includes(refCode) ||
+          segmentedNormalized.includes(normalizeBiomarkerCode(biomarker.name))
+        ) {
+          if (logger) {
+            logger.debug(`Validated segmented biomarker in database: "${biomarkerName}" -> "${segmented}" (matched: ${biomarker.name})`);
+          }
+          return true;
+        }
+      }
+    }
   } catch (err) {
     console.error('Error checking biomarker against database:', err);
     // Fall back to pattern matching if database check fails
@@ -322,23 +516,35 @@ export async function isValidBiomarkerName(biomarkerName: string, logger?: any):
   // Most biomarker names have specific patterns
   const likelyBiomarkerPatterns = [
     /\b(a|ab|hla|hdl|ldl|vldl|apolipoprotein)\b/i,  // Common prefixes
-    /\b(vitamin|vit)\s+[a-e]\d*/i,                  // Vitamins
+    /\b(vitamin|vit)\s*[a-e]\d*/i,                  // Vitamins
     /\bimmunoglobulin\b/i,                          // Immunoglobulins
     /\blipid\b/i,                                   // Lipid related
     /\bhormone\b/i,                                 // Hormone related
     /\bantibod(y|ies)\b/i,                          // Antibody tests
     /\bantigen\b/i,                                 // Antigen tests
-    /\bratio\b/i                                    // Ratio measurements
+    /\bratio\b/i,                                   // Ratio measurements
+    /\b(cholesterol|glucose|triglyceride|insulin|protein|calcium|sodium|potassium)\b/i, // Common tests
+    /\b(t3|t4|tsh|pth|acth|lh|fsh)\b/i,             // Common hormone tests
+    /\b(folate|ferritin|iron|b12)\b/i,              // Common nutrient tests
   ];
   
   // Check if name matches any biomarker-like patterns
   for (const pattern of likelyBiomarkerPatterns) {
-    if (pattern.test(normalized)) {
+    if (pattern.test(normalized) || (segmented !== normalized && pattern.test(segmented))) {
       if (logger) {
         logger.debug(`Validated biomarker - matches likely pattern: "${biomarkerName}" (pattern: ${pattern})`);
       }
       return true;
     }
+  }
+  
+  // Try fuzzy matching as a last resort
+  const fuzzyMatch = fuzzyMatchBiomarker(normalized, 0.85, logger);
+  if (fuzzyMatch) {
+    if (logger) {
+      logger.debug(`Validated biomarker via fuzzy matching: "${biomarkerName}" -> code: ${fuzzyMatch}`);
+    }
+    return true;
   }
   
   // Not in our known list and doesn't look like a biomarker

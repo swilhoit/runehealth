@@ -4,6 +4,9 @@ module.exports = {
   content: ["app/**/*.{ts,tsx}", "components/**/*.{ts,tsx}", "*.{js,ts,jsx,tsx,mdx}"],
   theme: {
     extend: {
+      fontFamily: {
+        heading: ["'Gilda Display'", "serif"],
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -37,6 +40,16 @@ module.exports = {
         card: {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
+        },
+        runeColors: {
+          primary100: "#ECE8E6",
+          primary200: "#E4D9CB",
+          primary300: "#E8D2B4",
+          primary400: "#7A8084",
+          primary500: "#736F7D",
+          primary600: "#555353",
+          accent100: "#725556",
+          accent200: "#865C69",
         },
         terra: {
           50: "#fdf4f1",

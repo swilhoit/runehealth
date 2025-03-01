@@ -15,7 +15,7 @@ function Symptom({ children, className }: SymptomProps) {
   return (
     <Badge
       variant="outline"
-      className={cn("bg-[#f8e5e1] text-[#8b4f45] border-[#e8c5bf] hover:bg-[#f8e5e1] hover:text-[#8b4f45]", className)}
+      className={cn("bg-[#E4D9CB] text-[#725556] border-[#ECE8E6] hover:bg-[#E4D9CB]/80 hover:text-[#725556]", className)}
     >
       {children}
     </Badge>

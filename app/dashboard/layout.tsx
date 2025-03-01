@@ -21,17 +21,17 @@ export default async function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-sand-50">
+    <div className="min-h-screen bg-[#F4F0EA]">
       <DashboardNav />
 
       {/* Main Content */}
-      <main className="ml-64 mr-80">
+      <div className="ml-64 mr-96">
         <div className="container mx-auto p-6">
-          <div className="bg-white rounded-lg shadow-sm border border-sand-200/50">
-            <div className="p-6">{children}</div>
+          <div className="bg-white rounded-lg shadow-sm border border-sand-200/50 p-6">
+            {children}
           </div>
         </div>
-      </main>
+      </div>
 
       {/* Chat Panel */}
       <ChatPanel />
