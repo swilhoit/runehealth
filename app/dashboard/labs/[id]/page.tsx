@@ -12,6 +12,7 @@ import { useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { Database } from "@/lib/supabase/database.types"
 import DeleteLabReportDialog from "@/components/delete-lab-report-dialog"
+import HealthRadarChart from "@/components/health-radar-chart"
 
 interface LabReportPageProps {
   params: {
@@ -990,116 +991,46 @@ export default function LabReportPage({ params }: LabReportPageProps) {
         {/* Right column - 1/3 width */}
         <div className="space-y-6">
           {/* Overall Health Score */}
-          <Card>
+          <Card className="border-sand-100 shadow-sm">
             <CardHeader>
               <CardTitle>Overall Health Score</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex flex-col items-center">
-                <div className="w-full">
-                  {/* Radar chart with real data - improved layout */}
-                  <div className="aspect-square relative mx-auto max-w-[280px] mb-6">
-                    {/* Radar chart background - cleaner circles */}
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <div className="w-full h-full rounded-full border border-gray-200 opacity-15"></div>
-                      <div className="absolute w-3/4 h-3/4 rounded-full border border-gray-200 opacity-30"></div>
-                      <div className="absolute w-1/2 h-1/2 rounded-full border border-gray-200 opacity-45"></div>
-                      <div className="absolute w-1/4 h-1/4 rounded-full border border-gray-200 opacity-60"></div>
-                    </div>
-                    
-                    {/* Radar chart labels - improved positioning with better contrast */}
-                    <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-4 text-xs font-medium bg-white px-2 py-1 rounded shadow-sm border border-sand-100">Cardiovascular</div>
-                    <div className="absolute right-0 top-1/2 transform translate-x-4 -translate-y-1/2 text-xs font-medium bg-white px-2 py-1 rounded shadow-sm border border-sand-100">Metabolic</div>
-                    <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-4 text-xs font-medium bg-white px-2 py-1 rounded shadow-sm border border-sand-100">Liver</div>
-                    <div className="absolute left-0 top-1/2 transform -translate-x-4 -translate-y-1/2 text-xs font-medium bg-white px-2 py-1 rounded shadow-sm border border-sand-100">Immunity</div>
-                    
-                    {/* Radar chart data lines with improved styling */}
-                    <svg className="absolute inset-0" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-                      {/* Axes - slightly thicker for better visibility */}
-                      <line x1="50" y1="50" x2="50" y2="0" stroke="#e5e7eb" strokeWidth="0.75" />
-                      <line x1="50" y1="50" x2="100" y2="50" stroke="#e5e7eb" strokeWidth="0.75" />
-                      <line x1="50" y1="50" x2="50" y2="100" stroke="#e5e7eb" strokeWidth="0.75" />
-                      <line x1="50" y1="50" x2="0" y2="50" stroke="#e5e7eb" strokeWidth="0.75" />
-                      
-                      {/* Data polygon - calculate position based on report data */}
-                      {(() => {
-                        // Debug info about categories and biomarker counts
-                        console.log("Biomarker categories:", Object.keys(report.categories));
-                        console.log("Total biomarkers:", report.results.length);
-                        Object.keys(report.categories).forEach(cat => {
-                          console.log(`Category '${cat}' has ${report.categories[cat].length} biomarkers`);
-                        });
-
-                        // Get metrics from different categories - using more flexible matching
-                        const cardioScore = getHealthScore(report, 
+              <div className="flex flex-col items-center space-y-6">
+                {/* Chart.js Radar Chart */}
+                {report && (
+                  <div className="w-full max-w-[350px] mx-auto">
+                    <HealthRadarChart 
+                      scores={{
+                        cardio: getHealthScore(report, 
                           ['lipid_panel', 'Lipid Panel'], 
                           ['total cholesterol', 'cholesterol, total', 'ldl', 'hdl', 'ldl cholesterol', 'hdl cholesterol']
-                        );
-                        
-                        const metabolicScore = getHealthScore(report, 
+                        ),
+                        metabolic: getHealthScore(report, 
                           ['metabolic_panel', 'Comp. Metabolic Panel (14)', 'Basic Metabolic Panel'],
                           ['glucose', 'blood urea nitrogen', 'urea nitrogen', 'bun', 'creatinine']
-                        );
-                        
-                        const liverScore = getHealthScore(report, 
+                        ),
+                        liver: getHealthScore(report, 
                           ['liver_panel', 'Liver Function Tests', 'Liver Panel'], 
                           ['alt', 'ast', 'bilirubin', 'alanine aminotransferase', 'aspartate aminotransferase', 'bilirubin, total']
-                        );
-                        
-                        const immunityScore = getHealthScore(report, 
+                        ),
+                        immunity: getHealthScore(report, 
                           ['complete_blood_count', 'CBC With Differential/Platelet', 'CBC'], 
                           ['white blood cell', 'wbc', 'neutrophils', 'lymphocytes', 'absolute neutrophils']
-                        );
-                        
-                        // Log the calculated scores
-                        console.log("Health Scores:", {
-                          cardioScore,
-                          metabolicScore,
-                          liverScore,
-                          immunityScore
-                        });
-                        
-                        // Calculate positions (normalized to 0-50 scale from center)
-                        const normalizeScore = (score: number) => Math.max(5, Math.min(50, score * 5));
-                        const cardioY = 50 - normalizeScore(cardioScore);
-                        const metabolicX = 50 + normalizeScore(metabolicScore);
-                        const liverY = 50 + normalizeScore(liverScore);
-                        const immunityX = 50 - normalizeScore(immunityScore);
-                        
-                        return (
-                          <>
-                            {/* Data polygon with slightly reduced opacity for more subtlety */}
-                            <polygon 
-                              points={`${cardioY} 50, 50 ${metabolicX}, ${liverY} 50, 50 ${immunityX}`} 
-                              fill="rgba(236, 108, 98, 0.15)" 
-                              stroke="#ec6c62" 
-                              strokeWidth="1.5"
-                            />
-                            {/* Larger data points for better visibility */}
-                            <circle cx="50" cy={cardioY} r="3.5" fill="#ec6c62" />
-                            <circle cx={metabolicX} cy="50" r="3.5" fill="#ec6c62" />
-                            <circle cx="50" cy={liverY} r="3.5" fill="#ec6c62" />
-                            <circle cx={immunityX} cy="50" r="3.5" fill="#ec6c62" />
-                          </>
-                        );
-                      })()}
-                    </svg>
+                        )
+                      }}
+                    />
                   </div>
-                </div>
+                )}
                 
-                {/* Updated Health Score Display with real data and improved styling */}
-                <div className="bg-terra-50 p-6 rounded-lg text-center w-full">
-                  <h3 className="text-terra-900 font-medium mb-3">Overall Health Score</h3>
-                  <div className="flex justify-center items-center">
-                    <div className="text-6xl font-bold text-terra-600">
-                      {Math.round(getOverallHealthScore(report) * 10) / 10}
-                    </div>
-                    <div className="text-2xl text-terra-600 ml-1">/10</div>
-                  </div>
-                  <p className="text-sm text-terra-700 mt-3">
-                    Based on your lab results across all categories
-                  </p>
+                {/* Score Display */}
+                <div className="flex flex-col items-center justify-center w-28 h-28 rounded-full bg-white border-4 border-terra-500 text-terra-600">
+                  <div className="text-3xl font-bold">{Math.round(report.score)}</div>
+                  <div className="text-sm font-medium">of 10</div>
                 </div>
+                <p className="text-sm text-center text-sand-600 max-w-xs">
+                  Based on your lab results across all categories
+                </p>
               </div>
             </CardContent>
           </Card>
