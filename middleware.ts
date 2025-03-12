@@ -7,7 +7,8 @@ export async function middleware(request: NextRequest) {
   
   const supabase = createMiddlewareClient({ req: request, res })
 
-  // Redirect root path to Webflow site
+  // Redirect ONLY the exact root path to Webflow site
+  // This ensures other paths like /auth, /dashboard etc. work on app.rune.health
   if (request.nextUrl.pathname === "/") {
     return NextResponse.redirect("https://rune.health")
   }
