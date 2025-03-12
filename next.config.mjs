@@ -15,12 +15,15 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    domains: ['rune.health'],
   },
   experimental: {
     webpackBuildWorker: true,
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  // Production configuration for app.rune.health subdomain
+  assetPrefix: process.env.NODE_ENV === 'production' ? 'https://app.rune.health' : '',
 }
 
 mergeConfig(nextConfig, userConfig)

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ClipboardList, Clock } from "lucide-react"
 import { motion } from "framer-motion"
 import { PatientSurvey } from "@/components/patient-survey"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createStandardClientComponentClient } from "@/lib/supabase/helpers"
 import { toast } from "@/components/ui/use-toast"
 import { Button } from "@/components/ui/button"
 
@@ -13,7 +13,7 @@ export default function HealthSurveyPage() {
   const [surveys, setSurveys] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [showSurvey, setShowSurvey] = useState(false)
-  const supabase = createClientComponentClient()
+  const supabase = createStandardClientComponentClient()
 
   useEffect(() => {
     const fetchSurveys = async () => {

@@ -7,6 +7,11 @@ export async function middleware(request: NextRequest) {
   
   const supabase = createMiddlewareClient({ req: request, res })
 
+  // Redirect root path to Webflow site
+  if (request.nextUrl.pathname === "/") {
+    return NextResponse.redirect("https://rune.health")
+  }
+
   // Refresh session if expired - this will update the session cookie if needed
   const {
     data: { session },

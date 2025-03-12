@@ -4,7 +4,7 @@ import { Suspense, useState, useEffect } from "react"
 import { useSearchParams } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { FileText, ClipboardList, Activity, AlertCircle, Zap } from "lucide-react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createStandardClientComponentClient } from "@/lib/supabase/helpers"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -16,7 +16,7 @@ export default function ReportsPage() {
   const [surveyData, setSurveyData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const supabase = createClientComponentClient()
+  const supabase = createStandardClientComponentClient()
 
   useEffect(() => {
     if (surveyId) {

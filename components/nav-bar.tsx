@@ -2,11 +2,15 @@ import Image from "next/image"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
+// Get the base URL for the app
+const APP_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://app.rune.health"
+const WEBFLOW_URL = "https://rune.health"
+
 export function NavBar() {
   return (
     <nav className="absolute top-0 left-0 right-0 z-50 mt-8">
       <div className="container mx-auto px-4 py-4 flex items-center justify-between max-w-6xl">
-        <Link href="/" className="flex items-center space-x-2">
+        <a href={WEBFLOW_URL} className="flex items-center space-x-2">
           <Image
             src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/rune-logo-white-WFrkJeL8QUkCCDN2pUAkDJi4VgvSwZ.png"
             alt="Rune Logo"
@@ -14,11 +18,11 @@ export function NavBar() {
             height={40}
             className="h-8 w-auto"
           />
-        </Link>
+        </a>
         <div className="flex items-center space-x-6">
-          <Link href="/about" className="text-white hover:text-sand-200 transition-colors font-light">
+          <a href={`${WEBFLOW_URL}/about`} className="text-white hover:text-sand-200 transition-colors font-light">
             About
-          </Link>
+          </a>
           <Link href="/dashboard" className="text-white hover:text-sand-200 transition-colors font-light">
             Dashboard
           </Link>
@@ -26,7 +30,7 @@ export function NavBar() {
             <Link href="/auth">Login</Link>
           </Button>
           <Button asChild className="bg-terra-600 hover:bg-terra-700 text-white px-4 py-2 rounded-md transition-colors">
-            <Link href="/get-started">Get Started</Link>
+            <Link href="/auth?register=true">Get Started</Link>
           </Button>
         </div>
       </div>

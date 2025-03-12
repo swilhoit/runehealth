@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createStandardClientComponentClient } from "@/lib/supabase/helpers"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { Upload, FileText, ClipboardList, TrendingUp, Clock, Zap, BarChart } from "lucide-react"
@@ -18,7 +18,7 @@ export default function DashboardPage() {
     loading: true
   })
   
-  const supabase = createClientComponentClient()
+  const supabase = createStandardClientComponentClient()
 
   useEffect(() => {
     const fetchUserData = async () => {

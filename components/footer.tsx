@@ -1,6 +1,10 @@
 import Link from "next/link"
 import { Facebook, Twitter, Instagram, Linkedin } from "lucide-react"
 
+// Get the base URL for the app
+const APP_URL = process.env.NEXT_PUBLIC_BASE_URL || "https://app.rune.health"
+const WEBFLOW_URL = "https://rune.health"
+
 export function Footer() {
   return (
     <footer className="bg-sand-100 text-sand-800 py-8">
@@ -16,14 +20,14 @@ export function Footer() {
             <h3 className="text-lg font-semibold mb-4">Quick Links</h3>
             <ul className="space-y-2">
               <li>
-                <Link href="/" className="text-sm hover:text-terra-600">
+                <a href={WEBFLOW_URL} className="text-sm hover:text-terra-600">
                   Home
-                </Link>
+                </a>
               </li>
               <li>
-                <Link href="/about" className="text-sm hover:text-terra-600">
+                <a href={`${WEBFLOW_URL}/about`} className="text-sm hover:text-terra-600">
                   About
-                </Link>
+                </a>
               </li>
               <li>
                 <Link href="/dashboard" className="text-sm hover:text-terra-600">
@@ -31,7 +35,7 @@ export function Footer() {
                 </Link>
               </li>
               <li>
-                <Link href="/get-started" className="text-sm hover:text-terra-600">
+                <Link href="/auth?register=true" className="text-sm hover:text-terra-600">
                   Get Started
                 </Link>
               </li>

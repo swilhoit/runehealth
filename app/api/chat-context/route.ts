@@ -2,6 +2,7 @@ import { createRouteHandlerClient } from "@supabase/auth-helpers-nextjs"
 import { cookies } from "next/headers"
 import { NextResponse } from "next/server"
 import { Logger } from "@/lib/logging" // Import logger
+import { createDirectClient, getLatestSurveyResult } from "@/lib/supabase/helpers"
 
 // Use Node.js runtime for Supabase operations
 export const runtime = "nodejs"
@@ -31,8 +32,19 @@ export async function GET(request: Request) {
   
   try {
     console.log("Creating Supabase client...");
-    const supabase = createRouteHandlerClient({ cookies })
-    console.log("Supabase client created");
+    const supabase = createRouteHandlerClient({ 
+      cookies,
+      options: {
+        global: {
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          }
+        }
+      }
+    });
+    console.log("Supabase client created with headers");
 
     // Verify session
     console.log("Verifying session...");
@@ -200,51 +212,35 @@ export async function GET(request: Request) {
       }
     };
 
-    // Fetch the latest health survey for this user
-    console.log("Fetching latest health survey data...");
+    // Fetch the latest health survey for this user using our reliable helper
+    console.log("Fetching latest health survey data using direct client...");
     try {
-      try {
-        const { data: latestSurvey, error: surveyError } = await supabase
-          .from("survey_results")
-          .select("*")
-          .eq("user_id", session.user.id)
-          .order("created_at", { ascending: false })
-          .limit(1)
-          .single();
-
-        if (surveyError && surveyError.code !== 'PGRST116') {
-          console.error("Error fetching health survey:", surveyError);
-          logger.warn("Failed to fetch health survey", { error: surveyError });
-          // Continue without survey data
-        } else if (latestSurvey) {
-          console.log("Found health survey data from:", new Date(latestSurvey.created_at).toLocaleDateString());
-          
-          // Format the survey completion date
-          const surveyDate = new Date(latestSurvey.created_at).toLocaleDateString('en-US', { 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          });
-          
-          // Add survey data to context
-          contextResponse.context.survey = {
-            id: latestSurvey.id,
-            completedDate: surveyDate,
-            data: latestSurvey.survey_data,
-            recommendations: latestSurvey.recommendations
-          };
-          
-          logger.info("Added survey data to chat context", {
-            surveyId: latestSurvey.id,
-            surveyDate: surveyDate
-          });
-        } else {
-          console.log("No health survey data found");
-        }
-      } catch (err) {
-        console.error("Exception accessing survey_results table:", err);
-        logger.warn("Exception accessing health survey data", { error: String(err) });
-        // Continue without survey data
+      const latestSurvey = await getLatestSurveyResult(session.user.id);
+      
+      if (latestSurvey) {
+        console.log("Found health survey data from:", new Date(latestSurvey.created_at).toLocaleDateString());
+        
+        // Format the survey completion date
+        const surveyDate = new Date(latestSurvey.created_at).toLocaleDateString('en-US', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        });
+        
+        // Add survey data to context
+        contextResponse.context.survey = {
+          id: latestSurvey.id,
+          completedDate: surveyDate,
+          data: latestSurvey.survey_data,
+          recommendations: latestSurvey.recommendations
+        };
+        
+        logger.info("Added survey data to chat context", {
+          surveyId: latestSurvey.id,
+          surveyDate: surveyDate
+        });
+      } else {
+        console.log("No health survey data found");
       }
     } catch (surveyFetchError) {
       console.error("Exception fetching health survey:", surveyFetchError);

@@ -38,7 +38,8 @@ export const supabase = (() => {
       global: {
         headers: {
           "Content-Type": "application/json",
-          "Accept": "application/json",
+          "Accept": "application/json, text/csv, */*",
+          "Prefer": "return=representation",
         },
       },
     }

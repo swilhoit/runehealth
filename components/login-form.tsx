@@ -10,22 +10,13 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { AlertCircle, Loader2 } from "lucide-react"
 import { motion } from "framer-motion"
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import { createStandardClientComponentClient } from "@/lib/supabase/helpers"
 import { useToast } from "@/components/ui/use-toast"
 import { Checkbox } from "@/components/ui/checkbox"
 
 export function LoginForm() {
   const router = useRouter()
-  const supabase = createClientComponentClient({
-    options: {
-      global: {
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-        },
-      },
-    },
-  })
+  const supabase = createStandardClientComponentClient()
   const { toast } = useToast()
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -44,13 +35,6 @@ export function LoginForm() {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: formData.email,
         password: formData.password,
-        options: {
-          // Set session expiration based on "Remember Me" checkbox
-          // 24 hours if not remembered, 30 days if remembered
-          persistSession: true, // Always persist the session
-          // Choose between short and long session duration
-          sessionExpiry: rememberMe ? 30 * 24 * 60 * 60 : 24 * 60 * 60, // 30 days : 24 hours
-        },
       })
 
       if (error) {
@@ -87,10 +71,6 @@ export function LoginForm() {
       const { data, error } = await supabase.auth.signInWithPassword({
         email: "demo@example.com",
         password: "demo123456",
-        options: {
-          persistSession: true,
-          sessionExpiry: 24 * 60 * 60, // 24 hours for demo account
-        },
       })
 
       if (error) {

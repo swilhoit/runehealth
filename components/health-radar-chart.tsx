@@ -29,6 +29,10 @@ interface HealthScore {
   metabolic: number;
   liver: number;
   immunity: number;
+  thyroid?: number;
+  vitamin?: number;
+  kidney?: number;
+  hormone?: number;
 }
 
 interface HealthRadarChartProps {
@@ -42,17 +46,36 @@ const HealthRadarChart: React.FC<HealthRadarChartProps> = ({ scores, className =
     return Math.max(0, Math.min(10, score));
   };
 
+  // Get all available scores (filter out undefined)
+  const getLabels = () => {
+    const labelMap: Record<string, string> = {
+      cardio: 'Cardiovascular',
+      metabolic: 'Metabolic',
+      liver: 'Liver',
+      immunity: 'Immunity',
+      thyroid: 'Thyroid',
+      vitamin: 'Vitamins',
+      kidney: 'Kidney',
+      hormone: 'Hormones'
+    };
+    
+    return Object.keys(scores)
+      .filter(key => scores[key as keyof HealthScore] !== undefined)
+      .map(key => labelMap[key] || key);
+  };
+  
+  const getData = () => {
+    return Object.keys(scores)
+      .filter(key => scores[key as keyof HealthScore] !== undefined)
+      .map(key => normalizeScore(scores[key as keyof HealthScore] || 0));
+  };
+
   const data: ChartData<'radar'> = {
-    labels: ['Cardiovascular', 'Metabolic', 'Liver', 'Immunity'],
+    labels: getLabels(),
     datasets: [
       {
         label: 'Health Score',
-        data: [
-          normalizeScore(scores.cardio),
-          normalizeScore(scores.metabolic),
-          normalizeScore(scores.liver),
-          normalizeScore(scores.immunity)
-        ],
+        data: getData(),
         backgroundColor: 'rgba(134, 92, 105, 0.2)', // #865C69 with opacity
         borderColor: '#865C69', // #865C69
         borderWidth: 2,
@@ -79,11 +102,11 @@ const HealthRadarChart: React.FC<HealthRadarChartProps> = ({ scores, className =
         pointLabels: {
           font: {
             family: "'Inter', 'Helvetica', 'Arial', sans-serif",
-            size: 10,
+            size: getLabels().length > 5 ? 8 : 10, // Smaller font for more categories
             weight: 500
           },
           color: '#7A8084', // Primary 400
-          padding: 10,
+          padding: getLabels().length > 5 ? 6 : 10, // Less padding for more categories
         },
         grid: {
           color: 'rgba(228, 217, 203, 0.4)', // #E4D9CB (Primary 200) with opacity
@@ -137,10 +160,10 @@ const HealthRadarChart: React.FC<HealthRadarChartProps> = ({ scores, className =
     maintainAspectRatio: true,
     layout: {
       padding: {
-        top: 10,
-        right: 10,
-        bottom: 10,
-        left: 10
+        top: 5,
+        right: getLabels().length > 5 ? 15 : 10,
+        bottom: 5,
+        left: getLabels().length > 5 ? 15 : 10
       }
     }
   };
@@ -149,7 +172,19 @@ const HealthRadarChart: React.FC<HealthRadarChartProps> = ({ scores, className =
     <div className={`w-full h-full mx-auto p-2 ${className}`}>
       <Radar 
         data={data} 
-        options={options}
+        options={{
+          ...options,
+          responsive: true,
+          maintainAspectRatio: true,
+          layout: {
+            padding: {
+              top: 5,
+              right: getLabels().length > 5 ? 15 : 10,
+              bottom: 5,
+              left: getLabels().length > 5 ? 15 : 10
+            }
+          }
+        }}
       />
     </div>
   );

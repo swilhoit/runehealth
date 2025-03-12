@@ -980,7 +980,7 @@ export default function LabReportPage({ params }: LabReportPageProps) {
               <div className="flex flex-col items-center space-y-6">
                 {/* Chart.js Radar Chart */}
                 {report && (
-                  <div className="w-full h-64 max-w-[300px] mx-auto mb-6">
+                  <div className="w-full h-72 max-w-[350px] mx-auto mb-6">
                     <HealthRadarChart 
                       scores={{
                         cardio: getHealthScore(report, 
@@ -998,6 +998,22 @@ export default function LabReportPage({ params }: LabReportPageProps) {
                         immunity: getHealthScore(report, 
                           ['complete_blood_count', 'CBC With Differential/Platelet', 'CBC'], 
                           ['white blood cell', 'wbc', 'neutrophils', 'lymphocytes', 'absolute neutrophils']
+                        ),
+                        thyroid: getHealthScore(report,
+                          ['thyroid_panel', 'Thyroid Panel', 'Thyroid Function Tests'],
+                          ['tsh', 'thyroid stimulating hormone', 't4', 't3', 'free t4', 'free t3']
+                        ),
+                        vitamin: getHealthScore(report,
+                          ['vitamin_panel', 'Vitamin Panel', 'Vitamins'],
+                          ['vitamin d', 'vitamin b12', 'vitamin b6', 'folate', 'vitamin a', 'vitamin e', 'vitamin c']
+                        ),
+                        kidney: getHealthScore(report,
+                          ['kidney_panel', 'Kidney Panel', 'Renal Function', 'Kidney Function'],
+                          ['bun', 'creatinine', 'egfr', 'uric acid', 'blood urea nitrogen']
+                        ),
+                        hormone: getHealthScore(report,
+                          ['hormone_panel', 'Hormone Panel', 'Hormones', 'Hormone Tests'],
+                          ['estradiol', 'testosterone', 'progesterone', 'dhea', 'cortisol', 'fsh', 'lh']
                         )
                       }}
                     />

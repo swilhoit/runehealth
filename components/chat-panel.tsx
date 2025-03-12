@@ -1,7 +1,7 @@
 "use client"
 
 import { useChat } from "ai/react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, Fragment } from "react"
 import { useRouter } from "next/navigation"
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
 import { useToast } from "@/components/ui/use-toast"
@@ -16,6 +16,8 @@ import ReactMarkdown from 'react-markdown'
 import { Gelasio, Albert_Sans, Gilda_Display, Inter } from 'next/font/google'
 import { getModelSettings } from "@/lib/ai-utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { nanoid } from "nanoid"
+import { cn } from "@/lib/utils"
 
 // Font definitions
 const albertSans = Albert_Sans({
@@ -116,11 +118,27 @@ export function ChatPanel() {
         headers: {
           'Accept': 'application/json',
           'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+          'X-Client-Info': 'supabase-js/2.36.0',
         },
       },
     },
   })
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  
+  // Add or update the apiUrl state
+  const [apiUrl, setApiUrl] = useState<string>('/api/chat');
+  
+  useEffect(() => {
+    // Update the API URL with the current origin when the component mounts
+    if (typeof window !== 'undefined') {
+      const origin = window.location.origin;
+      // Include report ID as context parameter if available
+      const contextParam = currentReportId ? `?context=${currentReportId}` : '';
+      setApiUrl(`${origin}/api/chat${contextParam}`);
+      console.log("Setting chat API URL to:", `${origin}/api/chat${contextParam}`);
+    }
+  }, [currentReportId]);
 
   // Get report ID from URL if available
   useEffect(() => {
@@ -154,12 +172,11 @@ export function ChatPanel() {
 
       // Fetch lab context
       try {
-        // Use relative URL instead of hardcoded localhost URL
-        console.log(`Fetching lab context from: /api/chat-context${currentReportId ? `?report_id=${currentReportId}` : ''}`);
-        
         // Create the URL dynamically based on the window location
-        const contextUrl = new URL(`/api/chat-context${currentReportId ? `?report_id=${currentReportId}` : ''}`, 
-          typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000');
+        const contextEndpoint = `/api/chat-context${currentReportId ? `?report_id=${currentReportId}` : ''}`;
+        const contextUrl = typeof window !== 'undefined' 
+          ? `${window.location.origin}${contextEndpoint}`
+          : contextEndpoint;
         
         console.log(`Fetching lab context from: ${contextUrl}`);
         const response = await fetch(contextUrl);
@@ -196,18 +213,105 @@ export function ChatPanel() {
     fetchUserAndLabData()
   }, [supabase, router, toast, currentReportId])
 
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages } = useChat({
-    api: "/api/chat",
-    body: {
-      // Include the report ID in the chat API request if available
-      reportId: currentReportId,
-      // Include model settings from localStorage
-      modelSettings: typeof window !== 'undefined' ? getModelSettings() : undefined
-    },
-    onFinish: () => {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-    },
-  })
+  // Use state to manage messages manually for maximum compatibility
+  const [messages, setMessages] = useState<any[]>([]);
+  const [input, setInput] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [error, setError] = useState<Error | null>(null);
+  
+  // Custom submit handler to replace useChat
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!input.trim()) return;
+    
+    // Add user message
+    const userMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: input,
+      createdAt: new Date().toISOString()
+    };
+    
+    // Update messages with user input
+    setMessages(prevMessages => [...prevMessages, userMessage]);
+    
+    // Clear input field
+    setInput('');
+    
+    // Start loading state
+    setIsLoading(true);
+    
+    try {
+      // Make sure we're using the URL with latest context
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const contextParam = currentReportId ? `?context=${currentReportId}` : '';
+      const chatEndpoint = `${origin}/api/chat${contextParam}`;
+      
+      console.log("Submitting chat form to:", chatEndpoint);
+      
+      // Send request to the chat API
+      const response = await fetch(chatEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          messages: [...messages, userMessage].map(m => ({
+            role: m.role,
+            content: m.content
+          })),
+          modelSettings: currentModel ? {
+            provider: currentModel.provider,
+            model: currentModel.model
+          } : undefined
+        }),
+      });
+      
+      console.log("Chat response received:", response.status);
+      
+      if (!response.ok) {
+        throw new Error(`Chat API error: ${response.status} ${response.statusText}`);
+      }
+      
+      // Parse JSON response
+      const assistantMessage = await response.json();
+      
+      // Add assistant message to the conversation
+      setMessages(prevMessages => [...prevMessages, assistantMessage]);
+      
+    } catch (err) {
+      console.error("Chat error:", err);
+      setError(err instanceof Error ? err : new Error(String(err)));
+      toast({
+        title: "Chat Error",
+        description: err instanceof Error ? err.message : "Failed to process chat message",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  // Handle input changes
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value);
+  };
+
+  // Add debug logging for message visibility
+  useEffect(() => {
+    if (messages.length > 0) {
+      console.log("Current messages:", messages.map(m => ({
+        id: m.id,
+        role: m.role,
+        content: m.content.substring(0, 20) + "...",
+      })));
+      // Force message visibility
+      const newVisibleMessages: Record<string, boolean> = {};
+      messages.forEach(m => { newVisibleMessages[m.id] = true; });
+      setVisibleMessages(newVisibleMessages);
+    }
+  }, [messages]);
 
   const toggleCollapse = () => setIsCollapsed(!isCollapsed)
   const toggleLabPanel = () => setShowLabPanel(!showLabPanel)
@@ -235,13 +339,12 @@ export function ChatPanel() {
       
       // Add "system" message showing model info
       const modelMessage = {
-        id: Date.now().toString(),
+        id: nanoid(),
         role: "assistant" as const,
         content: `📢 **Current AI Configuration**\n\n- **Provider**: ${modelInfo.provider.charAt(0).toUpperCase() + modelInfo.provider.slice(1)}\n- **Model**: ${modelInfo.model}\n- **API Key**: ${modelInfo.apiKeys[provider] ? "✅ Set" : "❌ Not set"}`,
       };
       
       setMessages([...messages, modelMessage]);
-      setVisibleMessages(prev => ({ ...prev, [modelMessage.id]: true }));
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
       
       // Clear input
@@ -339,25 +442,27 @@ export function ChatPanel() {
     return "normal";
   }
 
-  // Use this to track which messages have been "typed"
+  // Update or add the message visibility handling
   const [visibleMessages, setVisibleMessages] = useState<Record<string, boolean>>({});
-  
-  // Add message to visible list after a short delay
+
+  // Ensure all messages are visible immediately without delay
   useEffect(() => {
     if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
+      console.log("Updating message visibility");
       
-      // Only animate AI messages that haven't been shown yet
-      if (lastMessage.role === 'assistant' && !visibleMessages[lastMessage.id]) {
-        const timer = setTimeout(() => {
-          setVisibleMessages(prev => ({ ...prev, [lastMessage.id]: true }));
-        }, 300);
-        
-        return () => clearTimeout(timer);
-      } else if (lastMessage.role === 'user') {
-        // User messages are immediately visible
-        setVisibleMessages(prev => ({ ...prev, [lastMessage.id]: true }));
-      }
+      // Create an object with all messages set to visible
+      const newVisibleMessages = messages.reduce((acc, message) => {
+        acc[message.id] = true;
+        return acc;
+      }, {} as Record<string, boolean>);
+      
+      // Update the visible messages state
+      setVisibleMessages(newVisibleMessages);
+      
+      console.log("All messages set to visible:", Object.keys(newVisibleMessages).length);
+      
+      // Scroll to the bottom
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages]);
 
@@ -377,14 +482,52 @@ export function ChatPanel() {
   }, [messages]);
 
   // Update form submission to check for special commands first
-  const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
-    // First check if this is a special command
-    if (handleSpecialCommands(e)) {
+  const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    
+    // Handle /model command
+    if (input.trim().toLowerCase() === "/model") {
+      const modelInfo = getModelSettings();
+      const provider = modelInfo.provider as keyof typeof modelInfo.apiKeys;
+      
+      // Add "system" message showing model info
+      const modelMessage = {
+        id: nanoid(),
+        role: "assistant" as const,
+        content: `📢 **Current AI Configuration**\n\n- **Provider**: ${modelInfo.provider.charAt(0).toUpperCase() + modelInfo.provider.slice(1)}\n- **Model**: ${modelInfo.model}\n- **API Key**: ${modelInfo.apiKeys[provider] ? "✅ Set" : "❌ Not set"}`,
+        createdAt: new Date().toISOString()
+      };
+      
+      setMessages([...messages, modelMessage]);
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      
+      // Clear input
+      setInput("");
       return;
     }
     
-    // Otherwise, handle as a normal message
-    handleSubmit(e);
+    // Otherwise, handle normally
+    if (input.trim()) {
+      await handleSubmit(e);
+    }
+  };
+
+  // Let's add a helper function to get the style classes based on the message type
+  const getMessageStyleClasses = (contentType: string) => {
+    switch (contentType) {
+      case 'code':
+        return "bg-[#1E293B] text-[#E2E8F0] font-mono";
+      case 'warning':
+        return "bg-[#FEF9C3] border border-[#FACC15]";
+      case 'recommendation':
+        return "bg-[#DCFCE7] border border-[#86EFAC]";
+      case 'summary':
+        return "bg-[#F3E8FF] border border-[#D8B4FE]";
+      case 'list':
+        return "bg-white border border-[#ECE8E6]";
+      default:
+        return "bg-white border border-[#ECE8E6]";
+    }
   };
 
   if (isCollapsed) {
@@ -593,91 +736,81 @@ export function ChatPanel() {
             {/* Messages */}
             <ScrollArea className="flex-1 p-4 bg-[#F4F0EA]">
               <div className="space-y-4">
-                {messages.map((message) => {
-                  if (message.role === "user") {
-                    // Render user message normally
-                    return (
-                      <div
-                        key={message.id}
-                        className="flex items-start gap-3 flex-row-reverse"
-                      >
-                        <Avatar className="w-8 h-8 bg-[#ECE8E6]/30 text-[#7A8084]">
-                          <AvatarImage src="/placeholder.svg" />
-                          <AvatarFallback className="font-[var(--font-albert-sans)]">
-                            {user?.name ? user.name.charAt(0).toUpperCase() : "U"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="rounded-lg px-3 py-2 max-w-[85%] font-[var(--font-albert-sans)] text-sm font-normal bg-[#725556] text-white ml-auto">
-                          {message.content}
+                {messages.length === 0 ? (
+                  <div className="text-center text-[#7A8084] py-4 italic font-[var(--font-albert-sans)] text-sm">
+                    No messages yet. Start a conversation!
+                  </div>
+                ) : (
+                  messages.map((message, index) => (
+                    <div 
+                      key={message.id} 
+                      className={cn(
+                        "group relative mb-4 flex items-start", 
+                        message.role === "user" ? "justify-end" : "justify-start",
+                        !visibleMessages[message.id] && "opacity-0",
+                        visibleMessages[message.id] && "opacity-100",
+                        "transition-opacity duration-300"
+                      )}
+                    >
+                      {message.role === "user" ? (
+                        <div className="flex items-start gap-3 flex-row-reverse">
+                          <Avatar className="w-8 h-8 bg-[#ECE8E6]/30 text-[#7A8084]">
+                            <AvatarImage src="/placeholder.svg" />
+                            <AvatarFallback>You</AvatarFallback>
+                          </Avatar>
+                          <div className="text-sm text-[#3A3A3A] px-3 py-2 bg-[#F4F2F1] rounded-[4px]">
+                            {formatMessage(message.content)}
+                          </div>
                         </div>
-                      </div>
-                    );
-                  } else {
-                    // Split assistant messages into chunks
-                    const messageChunks = splitMessage(message.content);
-                    
-                    return (
-                      <div key={message.id} className="space-y-2 message-group">
-                        {messageChunks.map((chunk, index) => {
-                          const contentType = getMessageStyle(chunk);
-                          const formattedChunk = formatMessage(chunk);
-                          
-                          return (
-                            <div
-                              key={`${message.id}-${index}`}
-                              className="flex items-start gap-3 group"
-                            >
-                              {index === 0 && (
-                                <Avatar className="w-8 h-8">
-                                  <AvatarImage src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Avatar-7Wuy3DH9iB7mlmqBrV9FA7z6JagBfk.png" />
-                                  <AvatarFallback>AI</AvatarFallback>
-                                </Avatar>
-                              )}
-                              {index > 0 && <div className="w-8" />}
-                              <div className="relative">
-                                <div
-                                  className={`rounded-lg px-3 py-2 max-w-[85%] font-albert-sans text-sm font-normal ${
-                                    contentType === 'warning' ? 'bg-[#9F7D20]/10 border border-[#9F7D20]/20 text-[#9F7D20]' :
-                                    contentType === 'recommendation' ? 'bg-[#437D4D]/10 border border-[#437D4D]/20 text-[#437D4D]' :
-                                    contentType === 'summary' ? 'bg-[#8A5C87]/10 border border-[#8A5C87]/20 text-[#8A5C87] font-medium' :
-                                    contentType === 'list' ? 'bg-[#ECE8E6]/10 border border-[#ECE8E6] text-[#7A8084]' :
-                                    contentType === 'code' ? 'bg-[#ECE8E6]/20 border border-[#ECE8E6] text-[#7A8084] font-mono' :
-                                    'bg-[#ECE8E6]/10 text-[#7A8084]'
-                                  } ${contentType !== 'code' ? 'bg-opacity-90 bg-[url("/message-pattern.png")] bg-cover' : ''}`}
-                                >
-                                  {visibleMessages[message.id] ? (
-                                    <div className="prose prose-sm max-w-none prose-headings:font-[var(--font-gelasio)] prose-headings:font-medium prose-stone dark:prose-invert prose-p:mb-2 prose-p:leading-relaxed prose-li:mb-1 prose-p:font-[var(--font-albert-sans)] prose-li:font-[var(--font-albert-sans)]">
-                                      <ReactMarkdown>{formattedChunk}</ReactMarkdown>
-                                    </div>
-                                  ) : (
-                                    <TypingAnimation />
-                                  )}
-                                </div>
-                                
-                                {/* Copy button */}
-                                {visibleMessages[message.id] && (
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={() => copyToClipboard(chunk, `${message.id}-${index}`)}
-                                    title="Copy to clipboard"
-                                  >
-                                    {copiedMessageId === `${message.id}-${index}` ? (
-                                      <Check className="h-3 w-3 text-[#437D4D]" />
-                                    ) : (
-                                      <Copy className="h-3 w-3 text-[#7A8084]/70" />
-                                    )}
-                                  </Button>
+                      ) : (
+                        <div className="space-y-2 flex flex-col">
+                          {splitMessage(message.content).map((chunk, chunkIndex) => {
+                            const contentType = getMessageStyle(chunk);
+                            const formattedChunk = formatMessage(chunk);
+                            
+                            return (
+                              <div
+                                key={`${message.id}-${chunkIndex}`}
+                                className="flex items-start gap-3 group"
+                              >
+                                {chunkIndex === 0 && (
+                                  <Avatar className="w-8 h-8">
+                                    <AvatarImage src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Avatar-7Wuy3DH9iB7mlmqBrV9FA7z6JagBfk.png" />
+                                    <AvatarFallback>AI</AvatarFallback>
+                                  </Avatar>
                                 )}
+                                {chunkIndex > 0 && <div className="w-8" />}
+                                <div className="relative">
+                                  <div
+                                    className={cn(
+                                      "text-sm text-[#3A3A3A] px-3 py-2 rounded-[4px]",
+                                      getMessageStyleClasses(contentType)
+                                    )}
+                                  >
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                      onClick={() => copyToClipboard(chunk, `${message.id}-${chunkIndex}`)}
+                                      title="Copy to clipboard"
+                                    >
+                                      {copiedMessageId === `${message.id}-${chunkIndex}` ? (
+                                        <Check className="h-3 w-3 text-[#437D4D]" />
+                                      ) : (
+                                        <Copy className="h-3 w-3 text-[#7A8084]" />
+                                      )}
+                                    </Button>
+                                    {formattedChunk}
+                                  </div>
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  }
-                })}
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  ))
+                )}
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
@@ -721,13 +854,17 @@ export function ChatPanel() {
                       <>AI has access to</>
                     )}
                   </span>
-                  {labContext?.hasResults && <span className="ml-1">lab data</span>}
+                  {labContext?.hasResults && (
+                    <span className="ml-1">
+                      lab data
+                      {currentReportId && <span className="text-green-700 ml-1">(ID: {currentReportId.substring(0, 8)}...)</span>}
+                    </span>
+                  )}
                   {labContext?.hasResults && hasSurveyData && <span className="mx-1">+</span>}
                   {hasSurveyData && <span className="ml-1">health survey</span>}
                 </div>
                 {(messages.length > 0) && (
                   <Button 
-                    variant="ghost" 
                     size="sm" 
                     className="h-6 font-[var(--font-albert-sans)] text-[10px] font-bold text-[#7A8084] hover:text-[#CC7756]"
                     onClick={() => setMessages([])}
