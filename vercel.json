@@ -22,11 +22,5 @@
       ]
     }
   ],
-  "trailingSlash": false,
-  "buildCommand": "npm run build",
-  "installCommand": "npm install",
-  "framework": "nextjs",
-  "github": {
-    "silent": true
-  }
+  "trailingSlash": false
 } 
