@@ -1,17 +1,4 @@
 {
-  "redirects": [
-    { 
-      "source": "/",
-      "has": [
-        {
-          "type": "host",
-          "value": "app.rune.health"
-        }
-      ],
-      "destination": "https://rune.health",
-      "permanent": false
-    }
-  ],
   "headers": [
     {
       "source": "/(.*)",
