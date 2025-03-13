@@ -7,11 +7,10 @@ export async function middleware(request: NextRequest) {
   
   const supabase = createMiddlewareClient({ req: request, res })
 
-  // Redirect ONLY the exact root path to Webflow site
-  // This ensures other paths like /auth, /dashboard etc. work on app.rune.health
-  if (request.nextUrl.pathname === "/") {
-    return NextResponse.redirect("https://rune.health")
-  }
+  // TEMPORARILY DISABLED: Root path redirect to debug issues
+  // if (request.nextUrl.pathname === "/") {
+  //   return NextResponse.redirect("https://rune.health")
+  // }
 
   // Refresh session if expired - this will update the session cookie if needed
   const {
