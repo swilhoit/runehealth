@@ -22,5 +22,7 @@
       ]
     }
   ],
-  "trailingSlash": false
+  "trailingSlash": false,
+  "buildCommand": "npm run build",
+  "installCommand": "npm install"
 } 
